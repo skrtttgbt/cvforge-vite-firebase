@@ -12,12 +12,12 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 }
 
-const hasConfig = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId)
+const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId)
+const app = isConfigured ? initializeApp(firebaseConfig) : null
 
-export const app = hasConfig ? initializeApp(firebaseConfig) : null
 export const auth = app ? getAuth(app) : null
 export const db = app ? getFirestore(app) : null
 export const storage = app ? getStorage(app) : null
 export const googleProvider = new GoogleAuthProvider()
 export const microsoftProvider = new OAuthProvider('microsoft.com')
-export const firebaseReady = hasConfig
+export { isConfigured }

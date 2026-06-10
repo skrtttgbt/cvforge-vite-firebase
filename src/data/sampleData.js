@@ -1,43 +1,40 @@
-export const sampleUser = {
+export const profile = {
   fullName: 'Juan Dela Cruz',
   email: 'juan.delacruz@email.com',
   phone: '+63 912 345 6789',
   location: 'Tarlac City, Philippines',
   targetRole: 'Full Stack Developer',
-  roleType: 'ICT Job Seeker',
+  experience: 'Mid-Level (2–5 years)',
   summary:
-    'Motivated and detail-oriented ICT graduate with experience in web development, application development, and database management. Skilled in building responsive and user-friendly applications using modern technologies.',
-  experienceLevel: 'Mid-Level (2-5 years)',
-  availability: 'Open to Opportunities',
-  photoUrl: ''
+    'Motivated and detail-oriented ICT graduate with experience in web development, application development, and database management.',
+  skills: ['JavaScript', 'React', 'Node.js', 'PHP', 'Laravel', 'MySQL', 'Firebase', 'REST API', 'GitHub'],
+  projects: [
+    { name: 'E-Commerce Web App', desc: 'Full-stack shopping platform with product management and orders.' },
+    { name: 'Task Management System', desc: 'Task app with authentication, CRUD operations, and role-based access.' },
+    { name: 'Cloud File Storage', desc: 'Secure upload and sharing solution using Firebase Storage.' }
+  ],
+  certs: ['AWS Certified Cloud Practitioner', 'Meta Front-End Developer Professional Certificate', 'JavaScript Algorithms and Data Structures'],
+  links: ['github.com/juandelacruz', 'linkedin.com/in/juan-delacruz', 'juan.dev']
 }
 
-export const skills = ['JavaScript', 'TypeScript', 'React', 'Next.js', 'Node.js', 'Express.js', 'PHP', 'Laravel', 'HTML5', 'CSS3', 'Tailwind CSS', 'Bootstrap', 'MySQL', 'PostgreSQL', 'MongoDB', 'Firebase', 'Git', 'Docker', 'AWS', 'REST APIs']
-
-export const projects = [
-  { title: 'E-Commerce Web Application', stack: 'Next.js, Node.js, MongoDB, Stripe', desc: 'Built a full-stack e-commerce platform with product management, shopping cart, and secure checkout.' },
-  { title: 'Task Management System', stack: 'React, Node.js, Express, PostgreSQL', desc: 'Developed a real-time task manager with authentication, API endpoints, and collaboration features.' },
-  { title: 'Cloud File Storage', stack: 'Laravel, MySQL, AWS S3', desc: 'Created a secure file storage system with file uploads, folder management, and role permissions.' }
+export const sourceCards = [
+  ['LinkedIn', 'Connected', 'https://www.linkedin.com/in/juan-delacruz', 'in'],
+  ['Indeed', 'Not Connected', 'https://www.indeed.com/cmp/your-profile', 'i'],
+  ['GitHub', 'Connected', 'https://github.com/juandelacruz', 'GH'],
+  ['GitLab', 'Not Connected', 'https://gitlab.com/your-username', 'GL'],
+  ['Coursera', 'Connected', 'https://coursera.org/user/juan-delacruz', 'C'],
+  ['Udemy', 'Not Connected', 'https://udemy.com/user/your-username', 'U'],
+  ['HireVue', 'Not Connected', 'https://hirevue.com/candidates/your-id', 'H'],
+  ['Glassdoor', 'Not Connected', 'https://glassdoor.com/profile/your-id', 'G']
 ]
 
-export const certifications = [
-  'AWS Certified Cloud Practitioner',
-  'Meta Front-End Developer Professional Certificate',
-  'JavaScript Algorithms and Data Structures'
+export const recentTokens = [
+  { candidate: 'Juan Dela Cruz', token: 'a7f9-3c2d-8b1e', type: 'Resume & Portfolio', expires: 'May 20, 2025', views: '0 / Unlimited', status: 'Active' },
+  { candidate: 'Maria Santos', token: 'b1e4-7d9a-3c2b', type: 'Resume Only', expires: 'May 16, 2025', views: '2 / 5', status: 'Active' },
+  { candidate: 'Alvin Reyes', token: 'c3b2-9f8e-1a4d', type: 'Resume & Portfolio', expires: 'May 12, 2025', views: '1 / 3', status: 'Expired' }
 ]
 
-export const platforms = [
-  { name: 'LinkedIn', key: 'linkedin', connected: true, url: 'https://www.linkedin.com/in/juan-delacruz', color: '#0a66c2' },
-  { name: 'Indeed', key: 'indeed', connected: false, url: 'https://www.indeed.com/cmp/your-profile', color: '#2557a7' },
-  { name: 'GitHub', key: 'github', connected: true, url: 'https://github.com/juandelacruz', color: '#111827' },
-  { name: 'GitLab', key: 'gitlab', connected: false, url: 'https://gitlab.com/your-username', color: '#fc6d26' },
-  { name: 'Coursera', key: 'coursera', connected: true, url: 'https://www.coursera.org/user/juan-delacruz', color: '#2a73cc' },
-  { name: 'Udemy', key: 'udemy', connected: false, url: 'https://www.udemy.com/user/your-username', color: '#a435f0' },
-  { name: 'HireVue', key: 'hirevue', connected: false, url: 'https://www.hirevue.com/candidates/your-id', color: '#e11d48' },
-  { name: 'Glassdoor', key: 'glassdoor', connected: false, url: 'https://www.glassdoor.com/profile/your-id', color: '#0caa41' }
-]
-
-export const interviewQuestions = [
+export const interviewItems = [
   'Can you describe a project where you built or integrated a REST API?',
   'How do you optimize the performance of a React application?',
   'Tell me about a time you handled a difficult technical problem during development.'
