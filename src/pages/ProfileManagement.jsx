@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
-import Card from "../components/Card";
-import FormField from "../components/FormField";
 import Button from "../components/Button";
+
+import PersonalInformationTab from "../components/profile/tabs/PersonalInformationTab";
+import EducationTab from "../components/profile/tabs/EducationTab";
+import ExperienceTab from "../components/profile/tabs/ExperienceTab";
+import SkillsTab from "../components/profile/tabs/SkillsTab";
+import ProjectsTab from "../components/profile/tabs/ProjectsTab";
+import CertificationsTab from "../components/profile/tabs/CertificationsTab";
 
 import { onAuthChange } from "../services/authService";
 import { getProfile, saveProfile } from "../services/firestoreService";
@@ -14,22 +19,46 @@ const tabs = [
   "Skills",
   "Projects",
   "Certifications",
-  "Links",
 ];
+
+const defaultEducation = {
+  primary: {
+    schoolName: "",
+    yearGraduated: "",
+  },
+  secondary: {
+    schoolName: "",
+    yearGraduated: "",
+  },
+  college: [],
+  vocational: [],
+  masters: [],
+  doctoral: [],
+};
+
+const defaultForm = {
+  fullName: "",
+  email: "",
+  phone: "",
+  location: "",
+  targetRole: "",
+  summary: "",
+
+  education: defaultEducation,
+  experience: [],
+  skills: [],
+  projects: [],
+  certifications: [],
+};
+
 export default function ProfileManagement() {
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
-  const [originalForm, setOriginalForm] = useState(null);
+  const [originalForm, setOriginalForm] = useState(defaultForm);
   const [activeTab, setActiveTab] = useState("Personal Information");
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    location: "",
-    targetRole: "",
-    summary: "",
-  });
+  const [form, setForm] = useState(defaultForm);
+
   const hasChanges = JSON.stringify(form) !== JSON.stringify(originalForm);
 
   useEffect(() => {
@@ -52,15 +81,40 @@ export default function ProfileManagement() {
             location: profile.location || "",
             targetRole: profile.targetRole || "",
             summary: profile.summary || "",
+
+            education: {
+              ...defaultEducation,
+              ...(profile.education || {}),
+              primary: {
+                ...defaultEducation.primary,
+                ...(profile.education?.primary || {}),
+              },
+              secondary: {
+                ...defaultEducation.secondary,
+                ...(profile.education?.secondary || {}),
+              },
+              college: profile.education?.college || [],
+              vocational: profile.education?.vocational || [],
+              masters: profile.education?.masters || [],
+              doctoral: profile.education?.doctoral || [],
+            },
+
+            experience: profile.experience || [],
+            skills: profile.skills || [],
+            projects: profile.projects || [],
+            certifications: profile.certifications || [],
           };
 
           setForm(profileData);
           setOriginalForm(profileData);
         } else {
-          setForm((prev) => ({
-            ...prev,
+          const newUserForm = {
+            ...defaultForm,
             email: user.email || "",
-          }));
+          };
+
+          setForm(newUserForm);
+          setOriginalForm(newUserForm);
         }
       } catch (error) {
         console.error(error);
@@ -73,10 +127,10 @@ export default function ProfileManagement() {
   }, []);
 
   const handleChange = (e) => {
-    setForm({
-      ...form,
+    setForm((prev) => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
   const handleSave = async () => {
@@ -92,12 +146,219 @@ export default function ProfileManagement() {
       alert("Failed to save profile");
     }
   };
+
   const handleEdit = () => {
     setIsEditing(true);
   };
+
   const handleCancel = () => {
     setForm(originalForm);
     setIsEditing(false);
+  };
+
+  // EDUCATION HANDLERS
+
+  const handleSingleEducationChange = (groupKey, fieldName, value) => {
+    setForm((prev) => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        [groupKey]: {
+          ...prev.education[groupKey],
+          [fieldName]: value,
+        },
+      },
+    }));
+  };
+
+  const handleMultipleEducationChange = (groupKey, index, fieldName, value) => {
+    setForm((prev) => {
+      const updatedList = [...(prev.education[groupKey] || [])];
+
+      updatedList[index] = {
+        ...updatedList[index],
+        [fieldName]: value,
+      };
+
+      return {
+        ...prev,
+        education: {
+          ...prev.education,
+          [groupKey]: updatedList,
+        },
+      };
+    });
+  };
+
+  const handleAddEducation = (groupKey, emptyItem) => {
+    setForm((prev) => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        [groupKey]: [
+          ...(prev.education[groupKey] || []),
+          { ...emptyItem },
+        ],
+      },
+    }));
+  };
+
+  const handleRemoveEducation = (groupKey, index) => {
+    setForm((prev) => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        [groupKey]: prev.education[groupKey].filter((_, i) => i !== index),
+      },
+    }));
+  };
+
+  // EXPERIENCE HANDLERS
+
+  const handleAddExperience = (emptyExperience) => {
+    setForm((prev) => ({
+      ...prev,
+      experience: [
+        ...(prev.experience || []),
+        { ...emptyExperience },
+      ],
+    }));
+  };
+
+  const handleRemoveExperience = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      experience: prev.experience.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleExperienceChange = (index, fieldName, value) => {
+    setForm((prev) => {
+      const updatedExperience = [...(prev.experience || [])];
+
+      updatedExperience[index] = {
+        ...updatedExperience[index],
+        [fieldName]: value,
+      };
+
+      if (fieldName === "isCurrent" && value === true) {
+        updatedExperience[index].endDate = "";
+      }
+
+      return {
+        ...prev,
+        experience: updatedExperience,
+      };
+    });
+  };
+
+  // SKILLS HANDLERS
+
+  const handleAddSkill = (emptySkill) => {
+    setForm((prev) => ({
+      ...prev,
+      skills: [
+        ...(prev.skills || []),
+        { ...emptySkill },
+      ],
+    }));
+  };
+
+  const handleRemoveSkill = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      skills: prev.skills.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSkillChange = (index, fieldName, value) => {
+    setForm((prev) => {
+      const updatedSkills = [...(prev.skills || [])];
+
+      updatedSkills[index] = {
+        ...updatedSkills[index],
+        [fieldName]: value,
+      };
+
+      return {
+        ...prev,
+        skills: updatedSkills,
+      };
+    });
+  };
+
+  // PROJECTS HANDLERS
+
+  const handleAddProject = (emptyProject) => {
+    setForm((prev) => ({
+      ...prev,
+      projects: [
+        ...(prev.projects || []),
+        { ...emptyProject },
+      ],
+    }));
+  };
+
+  const handleRemoveProject = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      projects: prev.projects.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleProjectChange = (index, fieldName, value) => {
+    setForm((prev) => {
+      const updatedProjects = [...(prev.projects || [])];
+
+      updatedProjects[index] = {
+        ...updatedProjects[index],
+        [fieldName]: value,
+      };
+
+      if (fieldName === "isOngoing" && value === true) {
+        updatedProjects[index].endDate = "";
+      }
+
+      return {
+        ...prev,
+        projects: updatedProjects,
+      };
+    });
+  };
+
+  // CERTIFICATIONS HANDLERS
+
+  const handleAddCertification = (emptyCertification) => {
+    setForm((prev) => ({
+      ...prev,
+      certifications: [
+        ...(prev.certifications || []),
+        { ...emptyCertification },
+      ],
+    }));
+  };
+
+  const handleRemoveCertification = (index) => {
+    setForm((prev) => ({
+      ...prev,
+      certifications: prev.certifications.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleCertificationChange = (index, fieldName, value) => {
+    setForm((prev) => {
+      const updatedCertifications = [...(prev.certifications || [])];
+
+      updatedCertifications[index] = {
+        ...updatedCertifications[index],
+        [fieldName]: value,
+      };
+
+      return {
+        ...prev,
+        certifications: updatedCertifications,
+      };
+    });
   };
 
   if (loading) {
@@ -113,51 +374,50 @@ export default function ProfileManagement() {
       title="Profile Management"
       subtitle="Manage and update your professional information"
     >
-    <div className="sticky top-20 z-10 m-5 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div>
-    <h3 className="font-bold text-ink">
-      {activeTab}
-    </h3>
+      <div className="sticky top-20 z-10 m-5 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div>
+          <h3 className="font-bold text-ink">{activeTab}</h3>
 
-    <p className="text-sm text-slate-500">
-      {isEditing
-        ? "Editing mode enabled"
-        : "Viewing profile information"}
-    </p>
-  </div>
+          <p className="text-sm text-slate-500">
+            {isEditing
+              ? "Editing mode enabled"
+              : "Viewing profile information"}
+          </p>
+        </div>
 
-  <div className="flex gap-3">
-    {!isEditing ? (
-      <Button onClick={handleEdit}>
-        Edit Profile
-      </Button>
-    ) : (
-      <>
-        <Button
-          variant="outline"
-          onClick={handleCancel}
-        >
-          Cancel
-        </Button>
+        <div className="flex gap-3">
+          {!isEditing ? (
+            <Button onClick={handleEdit}>
+              Edit Profile
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+              >
+                Cancel
+              </Button>
 
-        <Button
-          onClick={handleSave}
-          disabled={!hasChanges}
-        >
-          {hasChanges
-            ? "Save Changes"
-            : "No Changes"}
-        </Button>
-      </>
-    )}
-  </div>
+              <Button
+                onClick={handleSave}
+                disabled={!hasChanges}
+              >
+                {hasChanges
+                  ? "Save Changes"
+                  : "No Changes"}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
 
-    </div>
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <div className="flex min-w-max gap-2 px-4 py-3">
           {tabs.map((tab) => (
             <button
               key={tab}
+              type="button"
               onClick={() => setActiveTab(tab)}
               className={`rounded-lg px-4 py-2 text-sm font-bold ${
                 activeTab === tab
@@ -172,260 +432,62 @@ export default function ProfileManagement() {
       </div>
 
       {activeTab === "Personal Information" && (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-          <Card title="Personal Information">
-            <div className="grid gap-4 md:grid-cols-2">
-              <FormField
-                label="Full Name"
-                name="fullName"
-                value={form.fullName}
-                onChange={handleChange}
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Email Address"
-                name="email"
-                value={form.email}
-                onChange={handleChange}
-                disabled
-              />
-
-              <FormField
-                label="Phone Number"
-                name="phone"
-                value={form.phone}
-                onChange={handleChange}
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Location"
-                name="location"
-                value={form.location}
-                onChange={handleChange}
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Target ICT Role"
-                as="select"
-                name="targetRole"
-                value={form.targetRole}
-                onChange={handleChange}
-                disabled={!isEditing}
-              >
-                <option value="">Select Role</option>
-                <option value="Full Stack Developer">
-                  Full Stack Developer
-                </option>
-                <option value="Frontend Developer">Frontend Developer</option>
-                <option value="Backend Developer">Backend Developer</option>
-                <option value="Mobile Developer">Mobile Developer</option>
-                <option value="UI/UX Designer">UI/UX Designer</option>
-                <option value="Data Analyst">Data Analyst</option>
-                <option value="Cybersecurity Specialist">
-                  Cybersecurity Specialist
-                </option>
-              </FormField>
-            </div>
-
-            <div className="mt-4">
-              <FormField
-                label="Professional Summary"
-                as="textarea"
-                name="summary"
-                value={form.summary}
-                onChange={handleChange}
-                disabled={!isEditing}
-              />
-            </div>
-
-         
-          </Card>
-
-          <div className="grid gap-5">
-            <Card title="Profile Photo">
-              <div className="grid place-items-center gap-4">
-                <div className="grid h-40 w-40 place-items-center rounded-full bg-blue-100 text-7xl">
-                  👨‍💻
-                </div>
-
-                <Button variant="outline">Change Photo</Button>
-
-                <p className="text-sm text-slate-500">JPG, PNG Max. 2MB</p>
-              </div>
-            </Card>
-
-            <Card title="Quick Tips">
-              <ul className="space-y-4 text-sm text-slate-700">
-                <li>Keep your profile updated.</li>
-                <li>
-                  Add complete information for better AI-generated results.
-                </li>
-                <li>Upload a clear professional profile photo.</li>
-              </ul>
-            </Card>
-          </div>
-        </div>
+        <PersonalInformationTab
+          form={form}
+          isEditing={isEditing}
+          onChange={handleChange}
+        />
       )}
 
       {activeTab === "Education" && (
-        <Card className="mt-5" title="Education">
-          <div className="space-y-6">
-            <div className="rounded-lg border border-slate-200 p-4">
-              <h3 className="mb-3 font-bold text-forge">Primary Education</h3>
-
-              <FormField
-                label="School Name"
-                name="primarySchool"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Year Graduated"
-                name="primaryYear"
-                disabled={!isEditing}
-              />
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-4">
-              <h3 className="mb-3 font-bold text-forge">Secondary Education</h3>
-
-              <FormField
-                label="School Name"
-                name="secondarySchool"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Year Graduated"
-                name="secondaryYear"
-                disabled={!isEditing}
-              />
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-4">
-              <h3 className="mb-3 font-bold text-forge">Tertiary Education</h3>
-
-              <FormField
-                label="College / University"
-                name="collegeSchool"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Degree Program"
-                name="collegeDegree"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Year Graduated"
-                name="collegeYear"
-                disabled={!isEditing}
-              />
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-4">
-              <h3 className="mb-3 font-bold text-forge">
-                Vocational / Technical Education
-              </h3>
-
-              <FormField
-                label="Institution"
-                name="vocationalSchool"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Course / NC Level"
-                name="vocationalCourse"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Completion Year"
-                name="vocationalYear"
-                disabled={!isEditing}
-              />
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-4">
-              <h3 className="mb-3 font-bold text-forge">Master's Degree</h3>
-
-              <FormField
-                label="University"
-                name="mastersSchool"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Degree"
-                name="mastersDegree"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Year Graduated"
-                name="mastersYear"
-                disabled={!isEditing}
-              />
-            </div>
-
-            <div className="rounded-lg border border-slate-200 p-4">
-              <h3 className="mb-3 font-bold text-forge">Doctoral Degree</h3>
-
-              <FormField
-                label="University"
-                name="doctoralSchool"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Degree"
-                name="doctoralDegree"
-                disabled={!isEditing}
-              />
-
-              <FormField
-                label="Year Graduated"
-                name="doctoralYear"
-                disabled={!isEditing}
-              />
-            </div>
-          </div>
-        </Card>
+        <EducationTab
+          form={form}
+          isEditing={isEditing}
+          onSingleEducationChange={handleSingleEducationChange}
+          onMultipleEducationChange={handleMultipleEducationChange}
+          onAddEducation={handleAddEducation}
+          onRemoveEducation={handleRemoveEducation}
+        />
       )}
 
       {activeTab === "Experience" && (
-        <Card className="mt-5" title="Experience">
-          <p>Experience form goes here.</p>
-        </Card>
+        <ExperienceTab
+          form={form}
+          isEditing={isEditing}
+          onAddExperience={handleAddExperience}
+          onRemoveExperience={handleRemoveExperience}
+          onExperienceChange={handleExperienceChange}
+        />
       )}
 
       {activeTab === "Skills" && (
-        <Card className="mt-5" title="Skills">
-          <p>Skills form goes here.</p>
-        </Card>
+        <SkillsTab
+          form={form}
+          isEditing={isEditing}
+          onAddSkill={handleAddSkill}
+          onRemoveSkill={handleRemoveSkill}
+          onSkillChange={handleSkillChange}
+        />
       )}
 
       {activeTab === "Projects" && (
-        <Card className="mt-5" title="Projects">
-          <p>Projects form goes here.</p>
-        </Card>
+        <ProjectsTab
+          form={form}
+          isEditing={isEditing}
+          onAddProject={handleAddProject}
+          onRemoveProject={handleRemoveProject}
+          onProjectChange={handleProjectChange}
+        />
       )}
 
       {activeTab === "Certifications" && (
-        <Card className="mt-5" title="Certifications">
-          <p>Certifications form goes here.</p>
-        </Card>
-      )}
-
-      {activeTab === "Links" && (
-        <Card className="mt-5" title="Links">
-          <p>Professional links form goes here.</p>
-        </Card>
+        <CertificationsTab
+          form={form}
+          isEditing={isEditing}
+          onAddCertification={handleAddCertification}
+          onRemoveCertification={handleRemoveCertification}
+          onCertificationChange={handleCertificationChange}
+        />
       )}
     </AppLayout>
   );

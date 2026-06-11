@@ -27,7 +27,7 @@ export default function App() {
       <Route path="/interview-preparation" element={<InterviewPreparation />} />
       <Route path="/token-management" element={<TokenManagement />} />
       <Route path="/access-token" element={<AccessToken />} />
-      <Route path="/shared-profile" element={<SharedProfile />} />
+      <Route path="/shared-profile/:userId" element={<SharedProfile />} />
       <Route path="/employer" element={<EmployerDashboard />} />
       <Route path="*" element={<Navigate to="/login" replace />} />
       <Route path="/complete-profile" element={<CompleteProfile />} />

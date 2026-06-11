@@ -12,6 +12,7 @@
     "@vitejs/plugin-react": "latest",
     "firebase": "latest",
     "html2canvas": "latest",
+    "html2pdf.js": "^0.14.0",
     "jspdf": "latest",
     "lucide": "^1.3.0",
     "lucide-react": "^1.17.0",

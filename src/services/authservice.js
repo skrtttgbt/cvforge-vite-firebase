@@ -27,7 +27,7 @@ export async function loginWithMicrosoft() {
   return result.user
 }
 
-export async function logout() {
+export async function logoutUser() {
   await signOut(auth)
 }
 
