@@ -3,14 +3,14 @@ import AppLayout from '../layouts/AppLayout'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import { FileText, Globe, MessageSquare, ShieldCheck } from 'lucide-react'
-
+import { useNavigate } from 'react-router-dom'
 import { onAuthChange } from '../services/authService'
 import { getProfile } from '../services/firestoreService'
 
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-
+  const navigate = useNavigate()
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
       try {
@@ -73,7 +73,7 @@ export default function Dashboard() {
             <div className="grid h-24 w-24 place-items-center rounded-full bg-blue-100 text-5xl">
               👨‍💻
             </div>
-
+            {profile?.fullName || profile?.targetRole ? (
             <div>
               <h2 className="text-2xl font-extrabold text-ink">
                 {profile?.fullName || 'No Name'}
@@ -87,27 +87,36 @@ export default function Dashboard() {
                 {profile?.summary || 'No summary available'}
               </p>
             </div>
+
+            ):(
+              <div>
+                <p className="text-slate-500">  No profile information available. Please complete your profile to see a snapshot here.</p>
+                <Button className="mt-3" variant="outline" onClick={() => navigate('/profile')}>
+                  Complete Profile
+                </Button>
+              </div>
+            )}
           </div>
         </Card>
 
         <Card title="Quick Actions">
           <div className="grid gap-3">
-            <Button>
+            <Button onClick={() => navigate('/resume-builder')}>
               <FileText size={16} />
               Generate Resume
             </Button>
 
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => navigate('/web-portfolio')}>
               <Globe size={16} />
               Create Portfolio
             </Button>
 
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => navigate('/interview-preparation')}>
               <MessageSquare size={16} />
               Practice Interview
             </Button>
 
-            <Button variant="outline">
+            <Button variant="outline" onClick={() => navigate('/token-management')}>
               <ShieldCheck size={16} />
               Generate Token
             </Button>
