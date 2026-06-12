@@ -159,7 +159,14 @@ export default function Login() {
             : "Continue with Microsoft"}
         </Button>
       </div>
-
+      <Button
+        // variant="outline"
+        type="button"
+        className="mt-3 w-full"
+        onClick={() => navigate("/access-token")}
+      >
+        Use Access Token
+      </Button>
       <p className="mt-6 text-center text-xs text-slate-500">
         By logging in, you agree to our{" "}
         <Link to="/terms" className="text-forge">

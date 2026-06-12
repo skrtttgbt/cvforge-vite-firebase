@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
 import StatusBadge from "../components/StatusBadge";
-import { Upload, Link2 } from "lucide-react";
+import { Upload, Link2, ExternalLink } from "lucide-react";
 
 import { onAuthChange } from "../services/authService";
 import {
@@ -71,6 +71,10 @@ export default function ProfileSources() {
   const [sources, setSources] = useState(defaultSources);
   const [notes, setNotes] = useState("");
 
+  const profileLinks = useMemo(() => {
+    return sources.filter((source) => source.url && source.url.trim());
+  }, [sources]);
+
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
       if (!user) {
@@ -84,7 +88,7 @@ export default function ProfileSources() {
         const savedSources = await getProfileSources(user.uid);
 
         if (savedSources) {
-          setSources(savedSources.sources || defaultSources);
+          setSources(normalizeSavedSources(savedSources.sources));
           setNotes(savedSources.notes || "");
         }
       } catch (error) {
@@ -197,9 +201,7 @@ export default function ProfileSources() {
                   {source.mark}
                 </div>
 
-                <h3 className="font-extrabold text-ink">
-                  {source.name}
-                </h3>
+                <h3 className="font-extrabold text-ink">{source.name}</h3>
               </div>
 
               <StatusBadge status={source.status} />
@@ -238,6 +240,29 @@ export default function ProfileSources() {
         ))}
       </div>
 
+      <Card className="mt-5" title="Profile Links">
+        {profileLinks.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            No profile links added yet. Add a URL above to show it here.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {profileLinks.map((source) => (
+              <a
+                key={source.name}
+                href={formatUrl(source.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-forge hover:bg-blue-50"
+              >
+                {source.name}
+                <ExternalLink size={14} />
+              </a>
+            ))}
+          </div>
+        )}
+      </Card>
+
       <Card className="mt-5" title="Additional Notes / Imported Content">
         <FormField
           label=""
@@ -255,4 +280,39 @@ export default function ProfileSources() {
       </Card>
     </AppLayout>
   );
+}
+
+function normalizeSavedSources(savedSources) {
+  if (!Array.isArray(savedSources)) return defaultSources;
+
+  return defaultSources.map((defaultSource) => {
+    const savedSource = savedSources.find(
+      (source) => source.name === defaultSource.name
+    );
+
+    if (!savedSource) return defaultSource;
+
+    const url = savedSource.url || "";
+
+    return {
+      ...defaultSource,
+      ...savedSource,
+      url,
+      status: url.trim()
+        ? savedSource.status === "Imported"
+          ? "Imported"
+          : "Connected"
+        : "Disconnected",
+    };
+  });
+}
+
+function formatUrl(url) {
+  if (!url) return "#";
+
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+
+  return `https://${url}`;
 }

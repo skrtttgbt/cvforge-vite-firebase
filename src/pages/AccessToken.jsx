@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import Logo from "../components/Logo";
 import Card from "../components/Card";
 import Button from "../components/Button";
@@ -12,74 +12,95 @@ import {
 } from "../services/firestoreService";
 
 export default function AccessToken() {
-  const [tokenInput, setTokenInput] = useState("");
+  const { tokenValue } = useParams();
+
+  const [tokenInput, setTokenInput] = useState(tokenValue || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
+  const autoAccessRan = useRef(false);
+
+  const verifyAndAccessToken = useCallback(
+    async (rawToken) => {
+      const cleanToken = rawToken?.trim();
+
+      if (!cleanToken) {
+        setError("Please enter a token.");
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const token = await findToken(cleanToken);
+
+        if (!token) {
+          setError("Invalid or non-existent token.");
+          return;
+        }
+
+        if (token.status === "Revoked") {
+          setError("This token has been revoked by the owner.");
+          return;
+        }
+
+        const expiresAt =
+          token.expiresAt?.toDate?.() || new Date(token.expiresAt);
+
+        if (
+          expiresAt &&
+          !Number.isNaN(expiresAt.getTime()) &&
+          expiresAt < new Date()
+        ) {
+          setError("This token has expired.");
+          return;
+        }
+
+        if (token.maxViews && (token.views || 0) >= token.maxViews) {
+          setError("This token has reached its access limit.");
+          return;
+        }
+
+        const employerId = getEmployerVisitorId();
+
+        await saveEmployerCandidateView(employerId, {
+          tokenId: token.id,
+          tokenValue: token.tokenValue,
+          ownerId: token.ownerId,
+          candidateName: token.candidateName,
+          candidateRole: token.candidateRole,
+          candidateEmail: token.candidateEmail,
+          accessType: token.accessType,
+          expiresAt: token.expiresAt,
+          status: token.status || "Active",
+          shareLink: token.shareLink,
+        });
+
+        await incrementTokenViews(token.id);
+
+        navigate(`/shared-profile/${token.ownerId}`, { replace: true });
+      } catch (err) {
+        console.error("Token access error:", err);
+        setError("Failed to verify token. Try again.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate]
+  );
+
+  useEffect(() => {
+    if (!tokenValue || autoAccessRan.current) return;
+
+    autoAccessRan.current = true;
+    setTokenInput(tokenValue);
+    verifyAndAccessToken(tokenValue);
+  }, [tokenValue, verifyAndAccessToken]);
 
   const handleAccess = async () => {
-    if (!tokenInput.trim()) {
-      setError("Please enter a token.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      const token = await findToken(tokenInput.trim());
-
-      if (!token) {
-        setError("Invalid or non-existent token.");
-        return;
-      }
-
-      if (token.status === "Revoked") {
-        setError("This token has been revoked by the owner.");
-        return;
-      }
-
-      const expiresAt = token.expiresAt?.toDate?.() || new Date(token.expiresAt);
-
-      if (
-        expiresAt &&
-        !Number.isNaN(expiresAt.getTime()) &&
-        expiresAt < new Date()
-      ) {
-        setError("This token has expired.");
-        return;
-      }
-
-      if (token.maxViews && (token.views || 0) >= token.maxViews) {
-        setError("This token has reached its access limit.");
-        return;
-      }
-
-      const employerId = getEmployerVisitorId();
-
-      await saveEmployerCandidateView(employerId, {
-        tokenId: token.id,
-        tokenValue: token.tokenValue,
-        ownerId: token.ownerId,
-        candidateName: token.candidateName,
-        candidateRole: token.candidateRole,
-        candidateEmail: token.candidateEmail,
-        accessType: token.accessType,
-        expiresAt: token.expiresAt,
-        status: token.status || "Active",
-        shareLink: token.shareLink,
-      });
-
-      await incrementTokenViews(token.id);
-
-      navigate(`/shared-profile/${token.ownerId}`);
-    } catch (err) {
-      console.error("Token access error:", err);
-      setError("Failed to verify token. Try again.");
-    } finally {
-      setLoading(false);
-    }
+    await verifyAndAccessToken(tokenInput);
   };
 
   return (
@@ -202,7 +223,11 @@ function getEmployerVisitorId() {
     return existingId;
   }
 
-  const newId = `employer-${crypto.randomUUID()}`;
+  const newId =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? `employer-${crypto.randomUUID()}`
+      : `employer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
   localStorage.setItem(key, newId);
 
   return newId;

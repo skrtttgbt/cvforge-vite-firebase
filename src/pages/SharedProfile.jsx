@@ -87,9 +87,10 @@ export default function SharedProfile() {
   );
 
   const certifications = useMemo(
-    () => normalizeCertifications(
-      resume?.certifications || profile?.certifications
-    ),
+    () =>
+      normalizeCertifications(
+        resume?.certifications || profile?.certifications
+      ),
     [resume, profile]
   );
 
@@ -150,221 +151,262 @@ export default function SharedProfile() {
       subtitle="Employer / HR secure candidate view"
       employer
     >
-      <div className="grid gap-5 xl:grid-cols-[1.6fr_0.9fr]">
-        <Card>
-          <div className="flex flex-col gap-6 md:flex-row">
-            <div className="grid h-32 w-32 shrink-0 place-items-center rounded-full bg-blue-100 text-6xl">
-              👨‍💻
-            </div>
+      <style>
+        {`
+          @media print {
+            body * {
+              visibility: hidden !important;
+            }
 
-            <div className="flex-1">
-              <h1 className="text-3xl font-extrabold text-ink">{fullName}</h1>
+            #print-area,
+            #print-area * {
+              visibility: visible !important;
+            }
 
-              <p className="font-bold text-forge">{targetRole}</p>
+            #print-area {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+              padding: 0;
+              margin: 0;
+            }
 
-              <p className="mt-3 max-w-2xl text-slate-600">{summary}</p>
+            .no-print {
+              display: none !important;
+            }
 
-              <div className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
-                <span>{email || "No email"}</span>
-                <span>{phone || "No phone"}</span>
-                <span>{location || "No location"}</span>
+            @page {
+              margin: 16mm;
+            }
+          }
+        `}
+      </style>
+
+      <div id="print-area">
+        <div className="grid gap-5 xl:grid-cols-[1.6fr_0.9fr] print:block">
+          <Card>
+            <div className="flex flex-col gap-6 md:flex-row">
+              <div className="grid h-32 w-32 shrink-0 place-items-center rounded-full bg-blue-100 text-6xl print:hidden">
+                👨‍💻
+              </div>
+
+              <div className="flex-1">
+                <h1 className="text-3xl font-extrabold text-ink">
+                  {fullName}
+                </h1>
+
+                <p className="font-bold text-forge">{targetRole}</p>
+
+                <p className="mt-3 max-w-2xl text-slate-600">{summary}</p>
+
+                <div className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-3">
+                  <span>{email || "No email"}</span>
+                  <span>{phone || "No phone"}</span>
+                  <span>{location || "No location"}</span>
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
-
-        <Card title="Profile Information">
-          <div className="grid gap-3 text-sm">
-            <Info label="Target Role" value={targetRole} />
-            <Info
-              label="Experience Level"
-              value={profile?.experienceLevel || "Not specified"}
-            />
-            <Info
-              label="Availability"
-              value={profile?.availability || "Open to Opportunities"}
-            />
-            <Info label="Last Updated" value={formatDate(profile?.updatedAt)} />
-          </div>
-        </Card>
-      </div>
-
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="grid gap-5">
-          <Card title="Professional Summary">
-            <p className="text-slate-600">{summary}</p>
           </Card>
 
-          <Card title="Work Experience">
-            {workExperience.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No work experience added yet.
-              </p>
-            ) : (
-              <div className="space-y-5">
-                {workExperience.map((job, index) => (
-                  <div key={index} className="border-b pb-4 last:border-0">
-                    <p className="font-bold text-ink">
-                      {job.jobTitle || "Job Title"}{" "}
-                      {job.companyName ? `| ${job.companyName}` : ""}
-                    </p>
-
-                    <p className="text-sm text-slate-500">
-                      {[job.location, formatDateRange(job.startDate, job.endDate)]
-                        .filter(Boolean)
-                        .join(" • ")}
-                    </p>
-
-                    {job.description && (
-                      <p className="mt-3 text-sm text-slate-600">
-                        {job.description}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-
-          <Card title="Education">
-            {educationItems.length === 0 ? (
-              <p className="text-sm text-slate-500">No education added yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {educationItems.map((edu, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between gap-4 border-b py-3 last:border-0"
-                  >
-                    <p>
-                      <b>{edu.degree || "Education"}</b>
-                      <br />
-                      {edu.school || "School not specified"}
-                    </p>
-
-                    <span className="text-sm text-slate-500">
-                      {edu.year || ""}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+          <Card title="Profile Information">
+            <div className="grid gap-3 text-sm">
+              <Info label="Target Role" value={targetRole} />
+              <Info
+                label="Experience Level"
+                value={profile?.experienceLevel || "Not specified"}
+              />
+              <Info
+                label="Availability"
+                value={profile?.availability || "Open to Opportunities"}
+              />
+              <Info
+                label="Last Updated"
+                value={formatDate(profile?.updatedAt)}
+              />
+            </div>
           </Card>
         </div>
 
-        <div className="grid gap-5">
-          <Card title="Skills">
-            {skills.length === 0 ? (
-              <p className="text-sm text-slate-500">No skills added yet.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {skills.map((skill, index) => (
-                  <span
-                    key={`${skill.name}-${index}`}
-                    className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold"
-                  >
-                    {skill.level ? `${skill.name} (${skill.level})` : skill.name}
-                  </span>
-                ))}
-              </div>
-            )}
-          </Card>
+        <div className="mt-5 grid gap-5 xl:grid-cols-[1.2fr_0.8fr] print:block">
+          <div className="grid gap-5">
+            <Card title="Professional Summary">
+              <p className="text-slate-600">{summary}</p>
+            </Card>
 
-          <Card title="Top Projects">
-            {projects.length === 0 ? (
-              <p className="text-sm text-slate-500">No projects added yet.</p>
-            ) : (
-              projects.map((project, index) => (
-                <div key={index} className="border-b py-3 last:border-0">
-                  <h3 className="font-bold text-ink">
-                    {project.projectTitle || "Untitled Project"}
-                  </h3>
+            <Card title="Work Experience">
+              {workExperience.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  No work experience added yet.
+                </p>
+              ) : (
+                <div className="space-y-5">
+                  {workExperience.map((job, index) => (
+                    <div key={index} className="border-b pb-4 last:border-0">
+                      <p className="font-bold text-ink">
+                        {job.jobTitle || "Job Title"}{" "}
+                        {job.companyName ? `| ${job.companyName}` : ""}
+                      </p>
 
-                  {project.description && (
-                    <p className="text-sm text-slate-600">
-                      {project.description}
-                    </p>
-                  )}
+                      <p className="text-sm text-slate-500">
+                        {[job.location, formatDateRange(job.startDate, job.endDate)]
+                          .filter(Boolean)
+                          .join(" • ")}
+                      </p>
 
-                  {project.technologiesUsed && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Tech: {project.technologiesUsed}
-                    </p>
-                  )}
-
-                  {(project.projectLink || project.repositoryLink) && (
-                    <div className="mt-2 flex flex-wrap gap-3">
-                      {project.projectLink && (
-                        <a
-                          href={project.projectLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm font-bold text-forge"
-                        >
-                          View Project ↗
-                        </a>
-                      )}
-
-                      {project.repositoryLink && (
-                        <a
-                          href={project.repositoryLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm font-bold text-forge"
-                        >
-                          Repository ↗
-                        </a>
+                      {job.description && (
+                        <p className="mt-3 text-sm text-slate-600">
+                          {job.description}
+                        </p>
                       )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))
-            )}
-          </Card>
+              )}
+            </Card>
 
-          <Card title="Certifications">
-            {certifications.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No certifications added yet.
-              </p>
-            ) : (
-              <ul className="list-inside list-disc text-sm text-slate-600">
-                {certifications.map((cert, index) => (
-                  <li key={index}>
-                    {cert.name}
-                    {cert.organization ? ` — ${cert.organization}` : ""}
-                    {cert.issueDate ? ` (${cert.issueDate})` : ""}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+            <Card title="Education">
+              {educationItems.length === 0 ? (
+                <p className="text-sm text-slate-500">No education added yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {educationItems.map((edu, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between gap-4 border-b py-3 last:border-0"
+                    >
+                      <p>
+                        <b>{edu.degree || "Education"}</b>
+                        <br />
+                        {edu.school || "School not specified"}
+                      </p>
 
-          <Card title="Profile Links">
-            {connectedSources.length === 0 ? (
-              <p className="text-sm text-slate-500">
-                No profile links shared yet.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {connectedSources.map((source) => (
-                  <a
-                    key={source.name}
-                    href={source.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-full border border-slate-200 px-3 py-1 text-sm font-bold text-forge hover:bg-blue-50"
-                  >
-                    {source.name} ↗
-                  </a>
-                ))}
-              </div>
-            )}
-          </Card>
+                      <span className="text-sm text-slate-500">
+                        {edu.year || ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <div className="grid gap-5">
+            <Card title="Skills">
+              {skills.length === 0 ? (
+                <p className="text-sm text-slate-500">No skills added yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {skills.map((skill, index) => (
+                    <span
+                      key={`${skill.name}-${index}`}
+                      className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold"
+                    >
+                      {skill.level
+                        ? `${skill.name} (${skill.level})`
+                        : skill.name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card title="Top Projects">
+              {projects.length === 0 ? (
+                <p className="text-sm text-slate-500">No projects added yet.</p>
+              ) : (
+                projects.map((project, index) => (
+                  <div key={index} className="border-b py-3 last:border-0">
+                    <h3 className="font-bold text-ink">
+                      {project.projectTitle || "Untitled Project"}
+                    </h3>
+
+                    {project.description && (
+                      <p className="text-sm text-slate-600">
+                        {project.description}
+                      </p>
+                    )}
+
+                    {project.technologiesUsed && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        Tech: {project.technologiesUsed}
+                      </p>
+                    )}
+
+                    {(project.projectLink || project.repositoryLink) && (
+                      <div className="mt-2 flex flex-wrap gap-3">
+                        {project.projectLink && (
+                          <a
+                            href={project.projectLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm font-bold text-forge"
+                          >
+                            View Project ↗
+                          </a>
+                        )}
+
+                        {project.repositoryLink && (
+                          <a
+                            href={project.repositoryLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-sm font-bold text-forge"
+                          >
+                            Repository ↗
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </Card>
+
+            <Card title="Certifications">
+              {certifications.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  No certifications added yet.
+                </p>
+              ) : (
+                <ul className="list-inside list-disc text-sm text-slate-600">
+                  {certifications.map((cert, index) => (
+                    <li key={index}>
+                      {cert.name}
+                      {cert.organization ? ` — ${cert.organization}` : ""}
+                      {cert.issueDate ? ` (${cert.issueDate})` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            <Card title="Profile Links">
+              {connectedSources.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  No profile links shared yet.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {connectedSources.map((source) => (
+                    <a
+                      key={source.name}
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-full border border-slate-200 px-3 py-1 text-sm font-bold text-forge hover:bg-blue-50"
+                    >
+                      {source.name} ↗
+                    </a>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 flex justify-end gap-3">
+      <div className="no-print mt-5 flex justify-end gap-3 print:hidden">
         <Button onClick={() => window.print()}>Download Resume PDF</Button>
         <Button variant="outline" onClick={() => window.print()}>
           Print Profile
@@ -549,4 +591,4 @@ function formatDateRange(startDate, endDate) {
   if (!startDate && !endDate) return "";
 
   return [startDate, endDate].filter(Boolean).join(" - ");
-}
+} 
