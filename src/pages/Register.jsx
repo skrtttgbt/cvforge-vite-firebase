@@ -110,16 +110,24 @@ export default function Register() {
         />
 
         <div>
-          <label className="flex gap-2 text-sm text-slate-600 cursor-pointer">
+          <label className="flex items-start gap-3 text-sm text-slate-600 cursor-pointer">
             <input
               type="checkbox"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
+              className="mt-1 shrink-0"
             />
-            I agree to the{' '}
-            <Link to="/terms" className="text-forge font-medium">Terms of Service</Link>
-            {' '}and{' '}
-            <Link to="/privacy" className="text-forge font-medium">Privacy Policy</Link>
+
+            <span className="leading-relaxed">
+              I agree to the{" "}
+              <Link to="/terms" className="font-medium text-forge">
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="font-medium text-forge">
+                Privacy Policy
+              </Link>
+            </span>
           </label>
           {errors.agreed && <p className="mt-1 text-xs text-red-500">{errors.agreed}</p>}
         </div>

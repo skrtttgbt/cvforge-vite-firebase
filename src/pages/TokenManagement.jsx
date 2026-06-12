@@ -4,6 +4,7 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
 import StatusBadge from "../components/StatusBadge";
+import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
   getProfile,
@@ -27,6 +28,14 @@ const defaultForm = {
   accessLimit: "Unlimited Views",
   allowDownload: true,
 };
+
+const toast = Swal.mixin({
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  timer: 2000,
+  timerProgressBar: true,
+});
 
 export default function TokenManagement() {
   const [userId, setUserId] = useState(null);
@@ -83,23 +92,48 @@ export default function TokenManagement() {
   const loadTokens = async (ownerId = userId) => {
     if (!ownerId) return;
 
+    setLoading(true);
+
     try {
       const savedTokens = await getTokensByOwner(ownerId);
       setTokens(savedTokens || []);
+
+      toast.fire({
+        icon: "success",
+        title: "Tokens refreshed",
+      });
     } catch (error) {
       console.error("Load tokens error:", error);
-      alert("Failed to load your tokens.");
+
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to load your tokens.",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGenerateToken = async () => {
     if (!userId) {
-      alert("You must be logged in to generate a token.");
+      Swal.fire({
+        icon: "warning",
+        title: "Login required",
+        text: "You must be logged in to generate a token.",
+      });
       return;
     }
 
     setGenerating(true);
-    setError("");
+
+    Swal.fire({
+      title: "Generating token...",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
 
     try {
       const tokenValue = crypto.randomUUID();
@@ -131,32 +165,53 @@ export default function TokenManagement() {
 
       setGeneratedToken(newToken);
       await loadTokens(userId);
+
+      Swal.fire({
+        icon: "success",
+        title: "Token generated",
+        text: "Your access token is ready.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
     } catch (error) {
       console.error("Generate token error:", error);
-      setError(error.message || "Failed to generate token.");
-    }
 
-    setGenerating(false);
+      Swal.fire({
+        icon: "error",
+        title: "Failed",
+        text: error.message || "Failed to generate token.",
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleCopyLink = async () => {
     if (!generatedToken?.shareLink) {
-      alert("Generate or view a token first.");
+      Swal.fire("No token", "Generate a token first.", "warning");
       return;
     }
 
     await navigator.clipboard.writeText(generatedToken.shareLink);
-    alert("Shareable link copied.");
+
+    toast.fire({
+      icon: "success",
+      title: "Link copied",
+    });
   };
 
   const handleCopyToken = async () => {
     if (!generatedToken?.tokenValue) {
-      alert("Generate or view a token first.");
+      Swal.fire("No token", "Generate a token first.", "warning");
       return;
     }
 
     await navigator.clipboard.writeText(generatedToken.tokenValue);
-    alert("Access token copied.");
+
+    toast.fire({
+      icon: "success",
+      title: "Token copied",
+    });
   };
 
   const handleShareEmail = () => {
@@ -190,38 +245,84 @@ Thank you.`
     if (!token?.id) return;
 
     if (token.ownerId !== userId) {
-      alert("You can only revoke your own token.");
+      Swal.fire({
+        icon: "error",
+        title: "Not allowed",
+        text: "You can only revoke your own token.",
+      });
       return;
     }
 
-    const confirmed = window.confirm("Revoke this token?");
-    if (!confirmed) return;
+    const result = await Swal.fire({
+      title: "Revoke token?",
+      text: "This will immediately disable access.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, revoke",
+    });
+
+    if (!result.isConfirmed) return;
 
     setRevokingId(token.id);
+
+    Swal.fire({
+      title: "Revoking...",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
 
     try {
       await revokeToken(token.id);
       await loadTokens();
-    } catch (error) {
-      console.error("Revoke token error:", error);
-      alert("Failed to revoke token.");
-    }
 
-    setRevokingId(null);
+      Swal.fire({
+        icon: "success",
+        title: "Revoked",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error(error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Failed",
+        text: "Could not revoke token.",
+      });
+    } finally {
+      setRevokingId(null);
+    }
   };
 
   const handleDelete = async (token) => {
     if (!token?.id) return;
 
     if (token.ownerId !== userId) {
-      alert("You can only delete your own token.");
+      Swal.fire({
+        icon: "error",
+        title: "Not allowed",
+        text: "You can only delete your own token.",
+      });
       return;
     }
 
-    const confirmed = window.confirm("Delete this token permanently?");
-    if (!confirmed) return;
+    const result = await Swal.fire({
+      title: "Delete token?",
+      text: "This action cannot be undone.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Delete",
+    });
+
+    if (!result.isConfirmed) return;
 
     setDeletingId(token.id);
+
+    Swal.fire({
+      title: "Deleting...",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
 
     try {
       await deleteToken(token.id);
@@ -230,12 +331,24 @@ Thank you.`
       if (generatedToken?.id === token.id) {
         setGeneratedToken(null);
       }
-    } catch (error) {
-      console.error("Delete token error:", error);
-      alert("Failed to delete token.");
-    }
 
-    setDeletingId(null);
+      Swal.fire({
+        icon: "success",
+        title: "Deleted",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error(error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Failed",
+        text: "Could not delete token.",
+      });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (loading) {

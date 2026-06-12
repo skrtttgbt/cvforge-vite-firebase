@@ -6,9 +6,20 @@ export default function AuthLayout({ type, children }) {
   const isLogin = type === 'login'
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-blue-50">
-      <header className="flex items-center justify-between bg-navy px-6 py-4 text-white md:px-10">
+      <header className="flex items-center justify-between bg-navy px-6 py-4 text-white md:px-10" id="header-authlayout">
         <Logo dark />
-        <div className="text-sm">{isLogin ? "Don't have an account?" : 'Already have an account?'} <Link className="ml-3 rounded-lg border border-white/40 px-4 py-2 font-bold" to={isLogin ? '/register' : '/login'}>{isLogin ? 'Sign Up' : 'Sign In'}</Link></div>
+          <div className="flex flex-col items-center gap-3 text-sm sm:flex-row sm:gap-0">
+            <span>
+              {isLogin ? "Don't have an account?" : "Already have an account?"}
+            </span>
+
+            <Link
+              className="rounded-lg border border-white/40 px-4 py-2 font-bold sm:ml-3"
+              to={isLogin ? "/register" : "/login"}
+            >
+              {isLogin ? "Sign Up" : "Sign In"}
+            </Link>
+          </div>
       </header>
       <main className="grid min-h-[calc(100vh-72px)] grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-2 lg:px-16">
         <section className="flex flex-col justify-center">

@@ -135,12 +135,37 @@ export default function WebPortfolio() {
 
   const generatePortfolio = async () => {
     if (!profile) {
-      alert("Profile data is missing. Please complete Profile Management first.");
+      Swal.fire({
+        icon: "warning",
+        title: "Missing Profile",
+        text: "Please complete your profile first.",
+      });
       return;
     }
 
+    if (generating) return;
+
+    const confirm = await Swal.fire({
+      title: "Generate Portfolio?",
+      text: "AI will build a modern portfolio from your data.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Generate",
+    });
+
+    if (!confirm.isConfirmed) return;
+
     setGenerating(true);
     setError("");
+
+    Swal.fire({
+      title: "Building Portfolio...",
+      html: "AI is designing your portfolio layout",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
 
     try {
       const result = await generateAIContent("Portfolio Draft", {
@@ -172,12 +197,26 @@ export default function WebPortfolio() {
           draft: result,
         });
       }
-    } catch (error) {
-      console.error("Portfolio generation error:", error);
-      setError(error.message || "Failed to generate portfolio.");
-    }
 
-    setGenerating(false);
+      Swal.fire({
+        icon: "success",
+        title: "Portfolio Ready!",
+        text: "Your modern portfolio has been generated.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error(error);
+      setError(error.message || "Failed to generate portfolio.");
+
+      Swal.fire({
+        icon: "error",
+        title: "Generation Failed",
+        text: "Something went wrong while building your portfolio.",
+      });
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleSaveDraft = async () => {
@@ -446,20 +485,20 @@ function PortfolioPreview({
         <b className="text-forge">{fullName}</b>
 
         <div className="hidden gap-5 sm:flex">
-          <span>About</span>
-          <span>Skills</span>
-          <span>Projects</span>
-          <span>Certificates</span>
-          <span>Links</span>
-          <span>Contact</span>
+          <a href="#about" className="cursor-pointer hover:text-forge">About</a>
+          <a href="#skills" className="cursor-pointer hover:text-forge">Skills</a>
+          <a href="#projects" className="cursor-pointer hover:text-forge">Projects</a>
+          <a href="#certs" className="cursor-pointer hover:text-forge">Certificates</a>
+          <a href="#links" className="cursor-pointer hover:text-forge">Links</a>
+          <a href="#contact" className="cursor-pointer hover:text-forge">Contact</a>
         </div>
       </div>
 
-      <div className="grid gap-6 bg-blue-50 p-6 md:grid-cols-[1.2fr_0.8fr]">
+      <div className="grid gap-6 bg-gradient-to-br from-blue-50 via-white to-slate-50 p-6 md:grid-cols-[1.2fr_0.8fr]">
         <div>
           <p className="text-sm text-slate-500">Hello, I'm</p>
 
-          <h2 className="text-4xl font-extrabold text-ink">{fullName}</h2>
+          <h2 className="text-4xl font-black tracking-tight text-ink">{fullName}</h2>
 
           <p className="mt-1 font-bold text-forge">{targetRole}</p>
 
@@ -542,18 +581,24 @@ function PortfolioPreview({
         </div>
       )}
 
-      <div className="grid gap-4 p-5 md:grid-cols-2">
-        <Mini title="About Me" text={about} />
+      <div className="grid gap-5 bg-slate-50 p-6 md:grid-cols-2">
+        <div id="about">
+          <Mini title="About Me" text={about} />
+        </div>
 
-        <Mini title="Technical Skills" text={formatSkills(skills)} />
+        <div id="skills">
+          <Mini title="Technical Skills" text={formatSkills(skills)} />
+        </div>
 
-        <Mini title="Featured Projects" text={formatProjects(projects)} />
+        <div id="projects">
+          <Mini title="Featured Projects" text={formatProjects(projects)} />
+        </div>
 
-        <Mini
-          title="Certificates"
-          text={formatCertificates(certifications)}
-        />
+        <div id="certs">
+          <Mini title="Certificates" text={formatCertificates(certifications)} />
+        </div>
 
+        <div id="links">
         <Mini
           title="Profile Links"
           customContent={
@@ -579,11 +624,12 @@ function PortfolioPreview({
             )
           }
         />
+        </div>
 
-        <Mini
-          title="Contact"
-          text={formatContact(email, phone, connectedSources)}
-        />
+        <div id="contact">
+          <Mini title="Contact" text={formatContact(email, phone, connectedSources)} />
+        </div>
+
       </div>
     </div>
   );
@@ -591,11 +637,13 @@ function PortfolioPreview({
 
 function Mini({ title, text, customContent }) {
   return (
-    <div className="rounded-lg border border-slate-200 p-4">
-      <h3 className="mb-2 font-bold text-ink">{title}</h3>
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+      <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-forge">
+        {title}
+      </h3>
 
       {customContent || (
-        <p className="text-sm text-slate-600">
+        <p className="text-sm leading-relaxed text-slate-600">
           {text || "No data available yet."}
         </p>
       )}

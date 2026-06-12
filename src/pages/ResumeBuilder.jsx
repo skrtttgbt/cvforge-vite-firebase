@@ -329,7 +329,23 @@ export default function ResumeBuilder() {
             )
           }
         >
-          <ResumePreview profile={profile} draft={draft} />
+           <div className="relative min-h-[300px]">
+              {generating && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
+                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-300 border-t-forge"></div>
+
+                  <p className="mt-3 text-sm font-medium text-slate-600">
+                    AI is generating your resume...
+                  </p>
+
+                  <p className="text-xs text-slate-400">
+                    This may take a few seconds
+                  </p>
+                </div>
+              )}
+
+              <ResumePreview profile={profile} draft={draft} />
+            </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
@@ -341,9 +357,22 @@ export default function ResumeBuilder() {
               {saving ? "Saving..." : "Save Draft"}
             </Button>
 
-            <Button variant="outline" onClick={generate} disabled={generating}>
-              <RefreshCw size={16} />
-              {draft ? "Regenerate" : "Generate First"}
+            <Button
+              onClick={generate}
+              className="mt-5 w-full"
+              disabled={generating}
+            >
+              {generating ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Generating Resume...
+                </div>
+              ) : (
+                <>
+                  <WandSparkles size={16} />
+                  Generate Resume
+                </>
+              )}
             </Button>
 
             <Button onClick={handleDownloadText} disabled={!draft}>

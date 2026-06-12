@@ -5,7 +5,7 @@ import Button from "../components/Button";
 import FormField from "../components/FormField";
 import StatusBadge from "../components/StatusBadge";
 import { Upload, Link2, ExternalLink } from "lucide-react";
-
+import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
   getProfileSources,
@@ -67,7 +67,7 @@ export default function ProfileSources() {
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
+  const [processingSource, setProcessingSource] = useState(null);
   const [sources, setSources] = useState(defaultSources);
   const [notes, setNotes] = useState("");
 
@@ -108,7 +108,7 @@ export default function ProfileSources() {
       updatedSources[index] = {
         ...updatedSources[index],
         url: value,
-        status: value.trim() ? "Connected" : "Disconnected",
+        status: value.trim() ? "Pending" : "Disconnected",
       };
 
       return updatedSources;
@@ -132,48 +132,163 @@ export default function ProfileSources() {
     });
   };
 
-  const handleImportSource = (index) => {
-    setSources((prev) => {
-      const updatedSources = [...prev];
+  const handleImportSource = async (index) => {
+    try {
+      setProcessingSource(index);
 
-      updatedSources[index] = {
-        ...updatedSources[index],
-        status: "Imported",
-      };
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      return updatedSources;
-    });
+      setSources((prev) => {
+        const updated = [...prev];
+
+        updated[index] = {
+          ...updated[index],
+          status: "Imported",
+        };
+
+        return updated;
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Imported",
+        text: "Profile data imported successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } finally {
+      setProcessingSource(null);
+    }
   };
 
-  const handleSourceAction = (index) => {
+  const handleSourceAction = async (index) => {
     const source = sources[index];
 
-    if (source.status === "Connected") {
-      handleImportSource(index);
+    // If pending → connect first
+    if (source.status === "Pending") {
+      setProcessingSource(index);
+
+      try {
+        // simulate validation / API check
+        await new Promise((r) => setTimeout(r, 1000));
+
+        setSources((prev) => {
+          const updated = [...prev];
+          updated[index].status = "Connected";
+          return updated;
+        });
+
+        Swal.fire({
+          icon: "success",
+          title: "Link Verified",
+          text: `${source.name} is now connected.`,
+          timer: 1500,
+          showConfirmButton: false,
+        });
+      } finally {
+        setProcessingSource(null);
+      }
+
       return;
     }
 
-    handleToggleSource(index);
+    // If connected → import
+    if (source.status === "Connected") {
+      await handleImportSource(index);
+      return;
+    }
+
+    // If imported → disconnect confirmation
+    const result = await Swal.fire({
+      title: "Disconnect?",
+      text: `Remove ${source.name}?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, disconnect",
+    });
+
+    if (!result.isConfirmed) return;
+
+    setSources((prev) => {
+      const updated = [...prev];
+      updated[index].status = "Disconnected";
+      updated[index].url = "";
+      return updated;
+    });
   };
 
   const handleSaveSources = async () => {
     if (!userId) {
-      alert("You must be logged in to save sources.");
+      Swal.fire({
+        icon: "warning",
+        title: "Login Required",
+        text: "You must be logged in to save sources.",
+      });
       return;
     }
+
+    // get only pending sources
+    const pendingSources = sources.filter((s) => s.status === "Pending");
+
+    if (pendingSources.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "Nothing to Save",
+        text: "No new links to confirm.",
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: "Confirm Sources",
+      html: `
+        <p>You are about to save the following:</p>
+        <ul style="text-align:left;margin-top:10px;">
+          ${pendingSources
+            .map((s) => `<li><b>${s.name}</b></li>`)
+            .join("")}
+        </ul>
+      `,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Confirm Save",
+    });
+
+    if (!result.isConfirmed) return;
 
     setSaving(true);
 
     try {
+      // simulate save
       await saveProfileSources(userId, {
         sources,
         notes,
       });
 
-      alert("Profile sources saved successfully!");
+      // mark only pending → connected
+      setSources((prev) =>
+        prev.map((s) =>
+          s.status === "Pending"
+            ? { ...s, status: "Connected" }
+            : s
+        )
+      );
+
+      Swal.fire({
+        icon: "success",
+        title: "Saved",
+        text: "Your profile sources have been confirmed.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (error) {
-      console.error("Error saving profile sources:", error);
-      alert("Failed to save profile sources.");
+      console.error(error);
+
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: "Failed to save profile sources.",
+      });
     }
 
     setSaving(false);
@@ -217,14 +332,21 @@ export default function ProfileSources() {
             <Button
               className="mt-4 w-full"
               variant={
-                source.status === "Connected" || source.status === "Imported"
+                source.status === "Imported"
                   ? "primary"
+                  : source.status === "Connected"
+                  ? "secondary"
                   : "outline"
               }
               onClick={() => handleSourceAction(index)}
-              disabled={!source.url.trim()}
+              disabled={!source.url.trim() || processingSource === index}
             >
-              {source.status === "Imported" ? (
+              {processingSource === index ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Processing...
+                </div>
+              ) : source.status === "Imported" ? (
                 "Imported"
               ) : source.status === "Connected" ? (
                 <>

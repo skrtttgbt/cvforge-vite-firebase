@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Button from "../components/Button";
-
+import Swal from "sweetalert2";
 import PersonalInformationTab from "../components/profile/tabs/PersonalInformationTab";
 import EducationTab from "../components/profile/tabs/EducationTab";
 import ExperienceTab from "../components/profile/tabs/ExperienceTab";
@@ -134,26 +134,75 @@ export default function ProfileManagement() {
   };
 
   const handleSave = async () => {
+    const result = await Swal.fire({
+      title: "Save Changes?",
+      text: "Do you want to save the changes to your profile?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Save",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
+
     try {
       await saveProfile(userId, form);
 
       setOriginalForm(form);
       setIsEditing(false);
 
-      alert("Profile saved successfully!");
+      Swal.fire({
+        icon: "success",
+        title: "Profile Saved",
+        text: "Your profile has been updated successfully.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (error) {
       console.error(error);
-      alert("Failed to save profile");
+
+      Swal.fire({
+        icon: "error",
+        title: "Save Failed",
+        text: "Unable to save your profile.",
+      });
     }
   };
 
   const handleEdit = () => {
     setIsEditing(true);
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "info",
+      title: "Edit mode enabled",
+      showConfirmButton: false,
+      timer: 1500,
+    });
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
+    const result = await Swal.fire({
+      title: "Discard Changes?",
+      text: "All unsaved changes will be lost.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Discard",
+      cancelButtonText: "Keep Editing",
+    });
+
+    if (!result.isConfirmed) return;
+
     setForm(originalForm);
     setIsEditing(false);
+
+    Swal.fire({
+      icon: "success",
+      title: "Changes Discarded",
+      timer: 1500,
+      showConfirmButton: false,
+    });
   };
 
   // EDUCATION HANDLERS
@@ -201,9 +250,28 @@ export default function ProfileManagement() {
         ],
       },
     }));
+
+    Swal.fire({
+      toast: true,
+      position: "top-end",
+      icon: "success",
+      title: "Education added",
+      timer: 1500,
+      showConfirmButton: false,
+    });
   };
 
-  const handleRemoveEducation = (groupKey, index) => {
+  const handleRemoveEducation = async (groupKey, index) => {
+    const result = await Swal.fire({
+      title: "Remove Entry?",
+      text: "This education record will be deleted.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Remove",
+    });
+
+    if (!result.isConfirmed) return;
+
     setForm((prev) => ({
       ...prev,
       education: {
@@ -211,6 +279,13 @@ export default function ProfileManagement() {
         [groupKey]: prev.education[groupKey].filter((_, i) => i !== index),
       },
     }));
+
+    Swal.fire({
+      icon: "success",
+      title: "Removed",
+      timer: 1200,
+      showConfirmButton: false,
+    });
   };
 
   // EXPERIENCE HANDLERS
@@ -225,11 +300,28 @@ export default function ProfileManagement() {
     }));
   };
 
-  const handleRemoveExperience = (index) => {
+  const handleRemoveExperience = async (index) => {
+    const result = await Swal.fire({
+      title: "Delete Experience?",
+      text: "This work experience will be removed.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Delete",
+    });
+
+    if (!result.isConfirmed) return;
+
     setForm((prev) => ({
       ...prev,
       experience: prev.experience.filter((_, i) => i !== index),
     }));
+
+    Swal.fire({
+      icon: "success",
+      title: "Experience Removed",
+      timer: 1200,
+      showConfirmButton: false,
+    });
   };
 
   const handleExperienceChange = (index, fieldName, value) => {
@@ -264,11 +356,27 @@ export default function ProfileManagement() {
     }));
   };
 
-  const handleRemoveSkill = (index) => {
+  const handleRemoveSkill = async (index) => {
+    const result = await Swal.fire({
+      title: "Remove Skill?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Remove",
+    });
+
+    if (!result.isConfirmed) return;
+
     setForm((prev) => ({
       ...prev,
       skills: prev.skills.filter((_, i) => i !== index),
     }));
+
+    Swal.fire({
+      icon: "success",
+      title: "Skill Removed",
+      timer: 1200,
+      showConfirmButton: false,
+    });
   };
 
   const handleSkillChange = (index, fieldName, value) => {
@@ -299,11 +407,28 @@ export default function ProfileManagement() {
     }));
   };
 
-  const handleRemoveProject = (index) => {
+  const handleRemoveProject = async (index) => {
+    const result = await Swal.fire({
+      title: "Delete Project?",
+      text: "This project will be removed.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Delete",
+    });
+
+    if (!result.isConfirmed) return;
+
     setForm((prev) => ({
       ...prev,
       projects: prev.projects.filter((_, i) => i !== index),
     }));
+
+    Swal.fire({
+      icon: "success",
+      title: "Project Removed",
+      timer: 1200,
+      showConfirmButton: false,
+    });
   };
 
   const handleProjectChange = (index, fieldName, value) => {
@@ -338,11 +463,28 @@ export default function ProfileManagement() {
     }));
   };
 
-  const handleRemoveCertification = (index) => {
+  const handleRemoveCertification = async (index) => {
+    const result = await Swal.fire({
+      title: "Delete Certification?",
+      text: "This certification will be removed.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Delete",
+    });
+
+    if (!result.isConfirmed) return;
+
     setForm((prev) => ({
       ...prev,
       certifications: prev.certifications.filter((_, i) => i !== index),
     }));
+
+    Swal.fire({
+      icon: "success",
+      title: "Certification Removed",
+      timer: 1200,
+      showConfirmButton: false,
+    });
   };
 
   const handleCertificationChange = (index, fieldName, value) => {
