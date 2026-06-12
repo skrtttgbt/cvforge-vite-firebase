@@ -11,6 +11,7 @@ import {
   Users,
 } from "lucide-react";
 import Logo from "./Logo";
+import { logoutUser } from "../services/authservice";
 
 const seekerLinks = [
   ["Dashboard", "/dashboard", Home],
@@ -42,15 +43,17 @@ export default function Sidebar({ employer = false }) {
 
   const employerLinks = [
     ["Dashboard", "/employer", Home],
-    ["Candidate View", currentSharedProfilePath || lastCandidateViewPath, Users],
+    [
+      "Candidate View",
+      currentSharedProfilePath || lastCandidateViewPath,
+      Users,
+    ],
   ];
 
   const links = employer ? employerLinks : seekerLinks;
 
   const handleLogout = async () => {
     try {
-      const { logoutUser } = await import("../services/authservice");
-
       await logoutUser();
       navigate("/login", { replace: true });
     } catch (error) {
