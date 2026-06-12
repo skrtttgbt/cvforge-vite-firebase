@@ -3,7 +3,7 @@ import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
-import { onAuthChange } from "../services/authService";
+import { onAuthChange } from "../services/authservice";
 import {
   getProfile,
   saveInterviewSession,

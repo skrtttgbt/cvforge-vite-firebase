@@ -49,7 +49,7 @@ export default function Sidebar({ employer = false }) {
 
   const handleLogout = async () => {
     try {
-      const { logoutUser } = await import("../services/authService");
+      const { logoutUser } = await import("../services/authservice");
 
       await logoutUser();
       navigate("/login", { replace: true });

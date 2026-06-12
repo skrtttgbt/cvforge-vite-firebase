@@ -9,7 +9,7 @@ import SkillsTab from "../components/profile/tabs/SkillsTab";
 import ProjectsTab from "../components/profile/tabs/ProjectsTab";
 import CertificationsTab from "../components/profile/tabs/CertificationsTab";
 
-import { onAuthChange } from "../services/authService";
+import { onAuthChange } from "../services/authservice";
 import { getProfile, saveProfile } from "../services/firestoreService";
 
 const tabs = [

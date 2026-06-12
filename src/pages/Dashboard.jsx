@@ -4,7 +4,7 @@ import Card from '../components/Card'
 import Button from '../components/Button'
 import { FileText, Globe, MessageSquare, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { onAuthChange } from '../services/authService'
+import { onAuthChange } from '../services/authservice'
 import { getProfile } from '../services/firestoreService'
 
 export default function Dashboard() {

@@ -15,7 +15,7 @@ import SharedProfile from "./pages/SharedProfile";
 import EmployerDashboard from "./pages/EmployerDashboard";
 import CompleteProfile from "./pages/CompleteProfile";
 
-import { onAuthChange } from "./services/authService";
+import { onAuthChange } from "./services/authservice";
 
 export default function App() {
   return (

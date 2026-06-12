@@ -6,7 +6,7 @@ import FormField from "../components/FormField";
 import StatusBadge from "../components/StatusBadge";
 import { Upload, Link2, ExternalLink } from "lucide-react";
 
-import { onAuthChange } from "../services/authService";
+import { onAuthChange } from "../services/authservice";
 import {
   getProfileSources,
   saveProfileSources,

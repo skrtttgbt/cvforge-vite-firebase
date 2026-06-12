@@ -4,7 +4,7 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
 import StatusBadge from "../components/StatusBadge";
-import { onAuthChange } from "../services/authService";
+import { onAuthChange } from "../services/authservice";
 import {
   getProfile,
   createToken,

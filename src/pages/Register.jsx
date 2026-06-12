@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../layouts/AuthLayout'
 import FormField from '../components/FormField'
 import Button from '../components/Button'
-import { registerWithEmail, loginWithGoogle, loginWithMicrosoft } from '../services/authService'
+import { registerWithEmail, loginWithGoogle, loginWithMicrosoft } from '../services/authservice'
 import { saveProfile, getProfile } from '../services/firestoreService.js'
 
 export default function Register() {

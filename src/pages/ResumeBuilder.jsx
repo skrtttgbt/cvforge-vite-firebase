@@ -5,7 +5,7 @@ import Button from "../components/Button";
 import FormField from "../components/FormField";
 import ResumePreview from "../components/ResumePreview";
 import { generateAIContent } from "../services/aiService";
-import { onAuthChange } from "../services/authService";
+import { onAuthChange } from "../services/authservice";
 import {
   getProfile,
   getResumeDraft,

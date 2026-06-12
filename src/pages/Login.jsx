@@ -7,7 +7,7 @@ import {
   loginWithEmail,
   loginWithGoogle,
   loginWithMicrosoft,
-} from "../services/authService";
+} from "../services/authservice";
 import { getProfile } from "../services/firestoreService";
 
 export default function Login() {
