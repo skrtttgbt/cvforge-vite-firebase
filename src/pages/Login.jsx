@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
 import AuthLayout from "../layouts/AuthLayout";
 import FormField from "../components/FormField";
 import Button from "../components/Button";
+
 import {
   loginWithEmail,
   loginWithGoogle,
   loginWithMicrosoft,
 } from "../services/authservice";
+
 import { getProfile } from "../services/firestoreService";
 
 export default function Login() {
@@ -16,69 +19,145 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
+
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(null);
   const [error, setError] = useState("");
 
+  const isBusy = loading || oauthLoading !== null;
+
   async function redirectAfterLogin(user) {
-    const existing = await getProfile(user.uid);
+    try {
+      console.log("Authenticated user:", user.uid);
 
-    console.log("Logged in user:", user.uid);
-    console.log("Existing profile:", existing);
+      const existingProfile = await getProfile(user.uid);
 
-    if (isProfileComplete(existing)) {
-      navigate("/dashboard", { replace: true });
+      console.log("Existing profile:", existingProfile);
+
+      if (isProfileComplete(existingProfile)) {
+        navigate("/dashboard", {
+          replace: true,
+        });
+
+        return true;
+      }
+
+      navigate("/complete-profile", {
+        replace: true,
+        state: {
+          user: {
+            uid: user.uid,
+            fullName: user.displayName || "",
+            email: user.email || "",
+            photoURL: user.photoURL || "",
+          },
+        },
+      });
+
+      return true;
+    } catch (profileError) {
+      /*
+       * Authentication has already succeeded here.
+       * This error is from Firestore, not Firebase Auth.
+       */
+      console.error(
+        "Profile loading error:",
+        profileError.code,
+        profileError.message,
+        profileError
+      );
+
+      setError(
+        getFriendlyProfileError(profileError.code)
+      );
+
+      return false;
+    }
+  }
+
+  async function handleEmailLogin(event) {
+    event.preventDefault();
+
+    if (!email.trim() || !password) {
+      setError("Please enter your email and password.");
       return;
     }
 
-    navigate("/complete-profile", {
-      replace: true,
-      state: {
-        user: {
-          uid: user.uid,
-          displayName: user.displayName || "",
-          email: user.email || "",
-        },
-      },
-    });
-  }
-
-  async function handleEmailLogin(e) {
-    e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const user = await loginWithEmail(email, password);
+      /*
+       * Only authentication errors are caught here.
+       * Remember-me is passed to authservice.
+       */
+      const user = await loginWithEmail(
+        email,
+        password,
+        remember
+      );
+
       await redirectAfterLogin(user);
-    } catch (err) {
-      console.error("Email login error:", err);
-      setError(getFriendlyError(err.code));
+    } catch (authError) {
+      console.error(
+        "Email authentication error:",
+        authError.code,
+        authError.message,
+        authError
+      );
+
+      setError(
+        getFriendlyAuthError(authError.code)
+      );
     } finally {
       setLoading(false);
     }
   }
 
   async function handleOAuth(provider) {
+    if (oauthLoading !== null) {
+      return;
+    }
+
     setError("");
     setOauthLoading(provider);
 
     try {
-      const user =
-        provider === "google"
-          ? await loginWithGoogle()
-          : await loginWithMicrosoft();
+      let user;
+
+      if (provider === "google") {
+        user = await loginWithGoogle(remember);
+      } else if (provider === "microsoft") {
+        user = await loginWithMicrosoft(remember);
+      } else {
+        throw new Error(
+          `Unsupported OAuth provider: ${provider}`
+        );
+      }
 
       await redirectAfterLogin(user);
-    } catch (err) {
-      console.error("OAuth login error:", err);
+    } catch (authError) {
+      console.error(
+        `${provider} authentication error:`,
+        authError.code,
+        authError.message,
+        authError
+      );
 
+      /*
+       * Do not display an error when the user
+       * intentionally closes the popup.
+       */
       if (
-        err.code !== "auth/popup-closed-by-user" &&
-        err.code !== "auth/cancelled-popup-request"
+        authError.code === "auth/popup-closed-by-user" ||
+        authError.code === "auth/cancelled-popup-request"
       ) {
-        setError(getFriendlyError(err.code));
+        return;
       }
+
+      setError(
+        getFriendlyAuthError(authError.code)
+      );
     } finally {
       setOauthLoading(null);
     }
@@ -87,17 +166,29 @@ export default function Login() {
   return (
     <AuthLayout type="login">
       <div className="text-center">
-        <h1 className="text-3xl font-extrabold text-ink">Welcome Back!</h1>
-        <p className="mt-2 text-slate-500">Login to your CVForge account</p>
+        <h1 className="text-3xl font-extrabold text-ink">
+          Welcome Back!
+        </h1>
+
+        <p className="mt-2 text-slate-500">
+          Login to your CVForge account
+        </p>
       </div>
 
-      <form className="mt-8 space-y-5" onSubmit={handleEmailLogin}>
+      <form
+        className="mt-8 space-y-5"
+        onSubmit={handleEmailLogin}
+      >
         <FormField
           label="Email Address"
           type="email"
           placeholder="Enter your email address"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(event) =>
+            setEmail(event.target.value)
+          }
+          disabled={isBusy}
+          autoComplete="email"
           required
         />
 
@@ -106,35 +197,58 @@ export default function Login() {
           type="password"
           placeholder="Enter your password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={(event) =>
+            setPassword(event.target.value)
+          }
+          disabled={isBusy}
+          autoComplete="current-password"
           required
         />
 
         <div className="flex items-center justify-between text-sm">
-          <label className="flex cursor-pointer gap-2">
+          <label className="flex cursor-pointer items-center gap-2">
             <input
               type="checkbox"
               checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
+              disabled={isBusy}
+              onChange={(event) =>
+                setRemember(event.target.checked)
+              }
             />
-            Remember me
+
+            <span>Remember me</span>
           </label>
 
-          <Link to="/forgot-password" className="font-bold text-forge">
+          <Link
+            to="/forgot-password"
+            className="font-bold text-forge"
+          >
             Forgot Password?
           </Link>
         </div>
 
-        {error && <p className="text-center text-sm text-red-500">{error}</p>}
+        {error && (
+          <p
+            className="rounded-lg bg-red-50 px-3 py-2 text-center text-sm text-red-600"
+            role="alert"
+            aria-live="polite"
+          >
+            {error}
+          </p>
+        )}
 
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isBusy}
+        >
           {loading ? "Logging in…" : "Login"}
         </Button>
       </form>
 
       <div className="my-6 flex items-center gap-3 text-sm text-slate-400">
         <hr className="flex-1" />
-        or continue with
+        <span>or continue with</span>
         <hr className="flex-1" />
       </div>
 
@@ -142,38 +256,48 @@ export default function Login() {
         <Button
           variant="outline"
           type="button"
-          disabled={oauthLoading !== null}
+          disabled={isBusy}
           onClick={() => handleOAuth("google")}
         >
-          {oauthLoading === "google" ? "Redirecting…" : "Continue with Google"}
+          {oauthLoading === "google"
+            ? "Signing in…"
+            : "Continue with Google"}
         </Button>
 
         <Button
           variant="outline"
           type="button"
-          disabled={oauthLoading !== null}
+          disabled={isBusy}
           onClick={() => handleOAuth("microsoft")}
         >
           {oauthLoading === "microsoft"
-            ? "Redirecting…"
+            ? "Signing in…"
             : "Continue with Microsoft"}
         </Button>
       </div>
+
       <Button
-        // variant="outline"
         type="button"
         className="mt-3 w-full"
+        disabled={isBusy}
         onClick={() => navigate("/access-token")}
       >
         Use Access Token
       </Button>
+
       <p className="mt-6 text-center text-xs text-slate-500">
         By logging in, you agree to our{" "}
-        <Link to="/terms" className="text-forge">
+        <Link
+          to="/terms"
+          className="text-forge"
+        >
           Terms of Service
         </Link>{" "}
         and{" "}
-        <Link to="/privacy" className="text-forge">
+        <Link
+          to="/privacy"
+          className="text-forge"
+        >
           Privacy Policy
         </Link>
         .
@@ -183,35 +307,84 @@ export default function Login() {
 }
 
 function isProfileComplete(profile) {
-  if (!profile) return false;
+  if (!profile) {
+    return false;
+  }
 
-  if (profile.profileComplete === true) return true;
+  if (profile.profileComplete === true) {
+    return true;
+  }
 
-  const hasBasicProfile =
-    profile.fullName?.trim() &&
-    profile.email?.trim() &&
-    profile.targetRole?.trim();
+  const hasFullName =
+    typeof profile.fullName === "string" &&
+    profile.fullName.trim() !== "";
 
-  return Boolean(hasBasicProfile);
+  const hasEmail =
+    typeof profile.email === "string" &&
+    profile.email.trim() !== "";
+
+  const hasTargetRole =
+    typeof profile.targetRole === "string" &&
+    profile.targetRole.trim() !== "";
+
+  return (
+    hasFullName &&
+    hasEmail &&
+    hasTargetRole
+  );
 }
 
-function getFriendlyError(code) {
+function getFriendlyAuthError(code) {
   switch (code) {
     case "auth/invalid-email":
       return "That email address doesn't look right.";
+
     case "auth/user-not-found":
     case "auth/wrong-password":
     case "auth/invalid-credential":
       return "Incorrect email or password.";
+
     case "auth/user-disabled":
       return "This account has been disabled.";
+
     case "auth/too-many-requests":
       return "Too many attempts. Please try again later.";
+
     case "auth/network-request-failed":
       return "Network error. Check your connection and try again.";
+
+    case "auth/operation-not-allowed":
+      return "This login method is not enabled in Firebase Authentication.";
+
+    case "auth/unauthorized-domain":
+      return "This domain is not authorized for Firebase Authentication.";
+
+    case "auth/popup-blocked":
+      return "The login popup was blocked. Allow popups and try again.";
+
     case "auth/account-exists-with-different-credential":
-      return "An account already exists with this email using a different sign-in method.";
+      return "An account already exists with this email using another login method.";
+
     default:
-      return "Something went wrong. Please try again.";
+      return "Login failed. Please try again.";
+  }
+}
+
+function getFriendlyProfileError(code) {
+  switch (code) {
+    case "permission-denied":
+      return "Login succeeded, but Firestore denied access to your profile. Check your Firestore security rules.";
+
+    case "unauthenticated":
+      return "Login succeeded, but Firestore could not verify your session.";
+
+    case "unavailable":
+      return "Login succeeded, but the profile service is temporarily unavailable.";
+
+    case "failed-precondition":
+      return "Login succeeded, but the profile database is not configured correctly.";
+
+    default:
+      return "Login succeeded, but your profile could not be loaded.";
   }
 }

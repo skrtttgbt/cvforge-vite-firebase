@@ -40,7 +40,7 @@ export default function CompleteProfile() {
   const user = location.state?.user
 
   const [form, setForm] = useState({
-    fullName: user?.displayName || '',
+    fullName: '',
     phone: '',
     location: '',
     targetRole: '',
@@ -70,7 +70,7 @@ export default function CompleteProfile() {
     setLoading(true)
     try {
       await saveProfile(user.uid, {
-        displayName: form.fullName,
+        fullName: form.fullName,
         email: user.email,
         phone: form.phone,
         location: form.location,

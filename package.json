@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
-    "firebase": "latest",
+    "firebase": "^12.17.0",
     "html2canvas": "latest",
     "html2pdf.js": "^0.14.0",
     "jspdf": "latest",

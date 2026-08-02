@@ -73,10 +73,10 @@ export default function Dashboard() {
             <div className="grid h-24 w-24 place-items-center rounded-full bg-blue-100 text-5xl">
               👨‍💻
             </div>
-            {profile?.fullName || profile?.targetRole ? (
+            {profile?.fullName|| profile?.displayName || profile?.targetRole ? (
             <div>
               <h2 className="text-2xl font-extrabold text-ink">
-                {profile?.fullName || 'No Name'}
+                {profile?.fullName || profile?.displayName || 'No Name'}
               </h2>
 
               <p className="font-bold text-forge">

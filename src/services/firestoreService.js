@@ -13,19 +13,30 @@ import {
 } from "firebase/firestore";
 
 import { db, isConfigured } from "./firebase";
-export async function saveProfile(userId, data) {
-  if (!isConfigured) return { offline: true, data };
+export async function saveProfile(userId, profileData) {
+  if (!userId) {
+    throw new Error(
+      "A user ID is required to save the profile."
+    );
+  }
 
-  await setDoc(
-    doc(db, "profiles", userId),
-    {
-      ...data,
-      updatedAt: serverTimestamp(),
-    },
-    { merge: true }
+  const profileRef = doc(
+    db,
+    "profiles",
+    userId
   );
 
-  return { success: true };
+  await setDoc(
+    profileRef,
+    {
+      ...profileData,
+      uid: userId,
+      updatedAt: serverTimestamp(),
+    },
+    {
+      merge: true,
+    }
+  );
 }
 
 export async function getProfile(userId) {
