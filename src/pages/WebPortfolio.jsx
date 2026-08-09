@@ -5,6 +5,7 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
 import ResumePreview from "../components/ResumePreview";
+import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
   getProfile,

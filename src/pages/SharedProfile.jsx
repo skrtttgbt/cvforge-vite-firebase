@@ -34,7 +34,11 @@ export default function SharedProfile() {
         const savedProfile = await getProfile(candidateId);
         const savedSources = await getProfileSources(candidateId);
         const savedResumeDraft = await getResumeDraft(candidateId);
-
+        console.log("Loaded shared profile data:", {
+          profile: savedProfile,
+          profileSources: savedSources,
+          resumeDraft: savedResumeDraft,
+        });
         setProfile(savedProfile || null);
         setProfileSources(savedSources?.sources || []);
         setResumeDraft(savedResumeDraft?.draft || null);
@@ -72,7 +76,7 @@ export default function SharedProfile() {
   );
 
   const educationItems = useMemo(
-    () => normalizeEducation(resume?.education || profile?.education),
+    () => normalizeEducation( profile?.education),
     [resume, profile]
   );
 
@@ -427,6 +431,7 @@ function Info({ label, value }) {
 
 function normalizeEducation(education) {
   if (!education) return [];
+  console.log("Normalizing education:", education);
 
   if (Array.isArray(education)) {
     return education.map((item) => ({
