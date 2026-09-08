@@ -13,9 +13,11 @@ import TokenManagement from "./pages/TokenManagement";
 import AccessToken from "./pages/AccessToken";
 import SharedProfile from "./pages/SharedProfile";
 import EmployerDashboard from "./pages/EmployerDashboard";
-import CompleteProfile from "./pages/CompleteProfile";
+import CompleteProfile from "./pages/Completeprofile";
 
 import { onAuthChange } from "./services/authservice";
+import { getProfile } from "./services/firestoreService";
+import { isProfileComplete } from "./utils/profileValidation";
 
 export default function App() {
   return (
@@ -115,20 +117,45 @@ function RequireAuth({ children }) {
 
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [user, setUser] = useState(null);
+  const [complete, setComplete] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [checkedPath, setCheckedPath] = useState(null);
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-    const unsubscribe = onAuthChange((currentUser) => {
-      setUser(currentUser || null);
-      setCheckingAuth(false);
-    });
-
-    return () => unsubscribe();
+    const refresh = () => { setCheckedPath(null); setRevision(value => value + 1); };
+    window.addEventListener('profile-saved', refresh);
+    return () => window.removeEventListener('profile-saved', refresh);
   }, []);
 
-  if (checkingAuth) {
+  useEffect(() => {
+    let active = true;
+    let request = 0;
+    const unsubscribe = onAuthChange(async (currentUser) => {
+      const currentRequest = ++request;
+      setCheckingAuth(true);
+      setProfileError("");
+      setUser(currentUser || null);
+      try {
+        const profile = currentUser ? await getProfile(currentUser.uid) : null;
+        if (active && currentRequest === request) setComplete(isProfileComplete(profile));
+      } catch {
+        if (active && currentRequest === request) setProfileError("Unable to check your profile. Please retry to continue.");
+      } finally {
+        if (active && currentRequest === request) {
+          setCheckedPath(location.pathname);
+          setCheckingAuth(false);
+        }
+      }
+    });
+
+    return () => { active = false; unsubscribe(); };
+  }, [location.pathname, revision]);
+
+  if (checkingAuth || checkedPath !== location.pathname) {
     return (
       <div className="grid min-h-screen place-items-center bg-slate-50">
-        <p className="text-sm font-semibold text-slate-500">Checking login...</p>
+        <p className="text-sm font-semibold text-slate-500">Checking your account...</p>
       </div>
     );
   }
@@ -136,6 +163,10 @@ function RequireAuth({ children }) {
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
+
+  if (profileError) return <div className="grid min-h-screen place-content-center gap-4 bg-slate-50 p-6"><p role="alert">{profileError}</p><button onClick={() => setRevision(value => value + 1)}>Retry</button></div>;
+  if (!complete && location.pathname !== '/complete-profile') return <Navigate to="/complete-profile" replace />;
+  if (complete && location.pathname === '/complete-profile') return <Navigate to="/dashboard" replace />;
 
   return children;
 }

@@ -3,7 +3,7 @@ export async function generateAIContent(type, payload = {}) {
   const endpoint = import.meta.env.VITE_AI_ENDPOINT;
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
   const groqModel =
-    import.meta.env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile";
+    import.meta.env.VITE_GROQ_MODEL || "openai/gpt-oss-20b";
 
   if (provider === "groq") {
     if (!endpoint) {
@@ -145,7 +145,7 @@ export async function generateInterviewAI(type, payload = {}) {
   const endpoint = import.meta.env.VITE_AI_ENDPOINT;
   const groqApiKey = import.meta.env.VITE_GROQ_API_KEY;
   const groqModel =
-    import.meta.env.VITE_GROQ_MODEL || "llama-3.3-70b-versatile";
+    import.meta.env.VITE_GROQ_MODEL || "openai/gpt-oss-20b";
 
   if (provider === "groq") {
     if (!endpoint) {

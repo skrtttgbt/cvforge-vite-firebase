@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getIncompleteSections, normalizePhilippineMobile, validateProfile } from "../utils/profileValidation";
 import AppLayout from "../layouts/AppLayout";
+import ProfileSetupLayout from "../layouts/ProfileSetupLayout";
 import Button from "../components/Button";
 import Swal from "sweetalert2";
 import PersonalInformationTab from "../components/profile/tabs/PersonalInformationTab";
@@ -41,7 +44,6 @@ const defaultForm = {
   email: "",
   phone: "",
   location: "",
-  targetRole: "",
   summary: "",
 
   education: defaultEducation,
@@ -51,7 +53,12 @@ const defaultForm = {
   certifications: [],
 };
 
-export default function ProfileManagement() {
+export default function ProfileManagement({ setup = false }) {
+  const Layout = setup ? ProfileSetupLayout : AppLayout;
+  const navigate = useNavigate();
+  const [saving, setSaving] = useState(false);
+  const [validationErrors, setValidationErrors] = useState([]);
+  const [loadError, setLoadError] = useState("");
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -59,6 +66,7 @@ export default function ProfileManagement() {
   const [activeTab, setActiveTab] = useState("Personal Information");
   const [form, setForm] = useState(defaultForm);
 
+  const incompleteSections = getIncompleteSections(form);
   const hasChanges = JSON.stringify(form) !== JSON.stringify(originalForm);
 
   useEffect(() => {
@@ -75,11 +83,10 @@ export default function ProfileManagement() {
 
         if (profile) {
           const profileData = {
-            fullName: profile.fullName || "",
+            fullName: profile.fullName || profile.displayName || user.displayName || "",
             email: profile.email || user.email || "",
             phone: profile.phone || "",
             location: profile.location || "",
-            targetRole: profile.targetRole || "",
             summary: profile.summary || "",
 
             education: {
@@ -107,24 +114,31 @@ export default function ProfileManagement() {
 
           setForm(profileData);
           setOriginalForm(profileData);
+          if (setup) {
+            setActiveTab(getIncompleteSections(profileData)[0] || "Personal Information");
+            setIsEditing(true);
+          }
         } else {
           const newUserForm = {
             ...defaultForm,
+            fullName: user.displayName || "",
             email: user.email || "",
           };
 
           setForm(newUserForm);
           setOriginalForm(newUserForm);
+          setIsEditing(true);
         }
       } catch (error) {
         console.error(error);
+        setLoadError("Unable to load your profile. Reload the page to try again.");
       }
 
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [setup]);
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -134,6 +148,13 @@ export default function ProfileManagement() {
   };
 
   const handleSave = async () => {
+    if (saving || !userId || loadError) return;
+    const errors = validateProfile(form);
+    setValidationErrors(errors);
+    if (errors.length) {
+      setActiveTab(errors[0].tab);
+      return;
+    }
     const result = await Swal.fire({
       title: "Save Changes?",
       text: "Do you want to save the changes to your profile?",
@@ -145,16 +166,23 @@ export default function ProfileManagement() {
 
     if (!result.isConfirmed) return;
 
+    setSaving(true);
     try {
-      await saveProfile(userId, form);
+      const saved = { ...form, phone: normalizePhilippineMobile(form.phone) };
+      await saveProfile(userId, saved);
+      if (!setup) window.dispatchEvent(new Event('profile-saved'));
 
-      setOriginalForm(form);
-      setIsEditing(false);
+      setForm(saved);
+      setOriginalForm(saved);
+      const remaining = getIncompleteSections(saved);
+      setIsEditing(setup && remaining.length > 0);
+      if (setup && remaining.length) setActiveTab(remaining[0]);
+      if (setup && !remaining.length) navigate("/dashboard", { replace: true });
 
       Swal.fire({
         icon: "success",
         title: "Profile Saved",
-        text: "Your profile has been updated successfully.",
+        text: setup && remaining.length ? `Progress saved. Next: ${remaining[0]}.` : "Your profile has been updated successfully.",
         timer: 2000,
         showConfirmButton: false,
       });
@@ -166,6 +194,8 @@ export default function ProfileManagement() {
         title: "Save Failed",
         text: "Unable to save your profile.",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -194,6 +224,7 @@ export default function ProfileManagement() {
 
     if (!result.isConfirmed) return;
 
+    setValidationErrors([]);
     setForm(originalForm);
     setIsEditing(false);
 
@@ -505,17 +536,29 @@ export default function ProfileManagement() {
 
   if (loading) {
     return (
-      <AppLayout title="Profile Management">
+      <Layout title="Profile Management">
         <p>Loading...</p>
-      </AppLayout>
+      </Layout>
     );
   }
 
+  if (loadError) return <Layout title="Profile Management"><p role="alert">{loadError}</p><Button onClick={() => window.location.reload()}>Retry</Button></Layout>;
+
   return (
-    <AppLayout
+    <Layout
       title="Profile Management"
       subtitle="Manage and update your professional information"
     >
+      {incompleteSections.length > 0 && (
+        <div className="m-5 rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <h2 className="font-bold text-ink">Complete your profile</h2>
+          <p className="mt-1 text-sm text-slate-600">{tabs.length - incompleteSections.length} of {tabs.length} sections complete. Fill in the remaining sections below.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {incompleteSections.map(tab => <Button key={tab} variant="outline" onClick={() => { setActiveTab(tab); setIsEditing(true); }}>{tab}</Button>)}
+          </div>
+        </div>
+      )}
+      {validationErrors.length > 0 && <div role="alert" className="m-5 rounded-xl bg-red-50 p-4 text-sm text-red-700"><ul className="list-disc pl-5">{validationErrors.map((error, index) => <li key={index}>{error.message}</li>)}</ul></div>}
       <div className="sticky top-20 z-10 m-5 flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <div>
           <h3 className="font-bold text-ink">{activeTab}</h3>
@@ -534,19 +577,20 @@ export default function ProfileManagement() {
             </Button>
           ) : (
             <>
-              <Button
+              {!setup && <Button
                 variant="outline"
                 onClick={handleCancel}
+                disabled={saving}
               >
                 Cancel
-              </Button>
+              </Button>}
 
               <Button
                 onClick={handleSave}
-                disabled={!hasChanges}
+                disabled={!hasChanges || saving}
               >
-                {hasChanges
-                  ? "Save Changes"
+                {saving ? "Saving..." : hasChanges
+                  ? setup ? incompleteSections.length ? "Save Progress" : "Finish Setup" : "Save Changes"
                   : "No Changes"}
               </Button>
             </>
@@ -576,7 +620,7 @@ export default function ProfileManagement() {
       {activeTab === "Personal Information" && (
         <PersonalInformationTab
           form={form}
-          isEditing={isEditing}
+          isEditing={isEditing && !saving}
           onChange={handleChange}
         />
       )}
@@ -584,7 +628,7 @@ export default function ProfileManagement() {
       {activeTab === "Education" && (
         <EducationTab
           form={form}
-          isEditing={isEditing}
+          isEditing={isEditing && !saving}
           onSingleEducationChange={handleSingleEducationChange}
           onMultipleEducationChange={handleMultipleEducationChange}
           onAddEducation={handleAddEducation}
@@ -595,7 +639,7 @@ export default function ProfileManagement() {
       {activeTab === "Experience" && (
         <ExperienceTab
           form={form}
-          isEditing={isEditing}
+          isEditing={isEditing && !saving}
           onAddExperience={handleAddExperience}
           onRemoveExperience={handleRemoveExperience}
           onExperienceChange={handleExperienceChange}
@@ -605,7 +649,7 @@ export default function ProfileManagement() {
       {activeTab === "Skills" && (
         <SkillsTab
           form={form}
-          isEditing={isEditing}
+          isEditing={isEditing && !saving}
           onAddSkill={handleAddSkill}
           onRemoveSkill={handleRemoveSkill}
           onSkillChange={handleSkillChange}
@@ -615,7 +659,7 @@ export default function ProfileManagement() {
       {activeTab === "Projects" && (
         <ProjectsTab
           form={form}
-          isEditing={isEditing}
+          isEditing={isEditing && !saving}
           onAddProject={handleAddProject}
           onRemoveProject={handleRemoveProject}
           onProjectChange={handleProjectChange}
@@ -625,12 +669,12 @@ export default function ProfileManagement() {
       {activeTab === "Certifications" && (
         <CertificationsTab
           form={form}
-          isEditing={isEditing}
+          isEditing={isEditing && !saving}
           onAddCertification={handleAddCertification}
           onRemoveCertification={handleRemoveCertification}
           onCertificationChange={handleCertificationChange}
         />
       )}
-    </AppLayout>
+    </Layout>
   );
 }

@@ -13,6 +13,8 @@ import {
 
 import { getProfile } from "../services/firestoreService";
 
+import { isProfileComplete } from "../utils/profileValidation";
+
 export default function Login() {
   const navigate = useNavigate();
 
@@ -28,11 +30,11 @@ export default function Login() {
 
   async function redirectAfterLogin(user) {
     try {
-      console.log("Authenticated user:", user.uid);
+
 
       const existingProfile = await getProfile(user.uid);
 
-      console.log("Existing profile:", existingProfile);
+
 
       if (isProfileComplete(existingProfile)) {
         navigate("/dashboard", {
@@ -303,34 +305,6 @@ export default function Login() {
         .
       </p>
     </AuthLayout>
-  );
-}
-
-function isProfileComplete(profile) {
-  if (!profile) {
-    return false;
-  }
-
-  if (profile.profileComplete === true) {
-    return true;
-  }
-
-  const hasFullName =
-    typeof profile.fullName === "string" &&
-    profile.fullName.trim() !== "";
-
-  const hasEmail =
-    typeof profile.email === "string" &&
-    profile.email.trim() !== "";
-
-  const hasTargetRole =
-    typeof profile.targetRole === "string" &&
-    profile.targetRole.trim() !== "";
-
-  return (
-    hasFullName &&
-    hasEmail &&
-    hasTargetRole
   );
 }
 

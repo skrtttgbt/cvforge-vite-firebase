@@ -6,6 +6,8 @@ import Button from '../components/Button'
 import { registerWithEmail, loginWithGoogle, loginWithMicrosoft } from '../services/authservice'
 import { saveProfile, getProfile } from '../services/firestoreService.js'
 
+import { isProfileComplete } from '../utils/profileValidation'
+
 export default function Register() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
@@ -36,8 +38,8 @@ export default function Register() {
     setLoading(true)
     try {
       const user = await registerWithEmail(form.email, form.password)
-      await saveProfile(user.uid, { displayName: form.name, email: form.email })
-      navigate('/dashboard')
+      await saveProfile(user.uid, { fullName: form.name.trim(), email: user.email })
+      navigate('/complete-profile', { replace: true })
     } catch (err) {
       setErrors({ global: getFriendlyError(err.code) })
     } finally {
@@ -51,7 +53,7 @@ export default function Register() {
     try {
       const user = provider === 'google' ? await loginWithGoogle() : await loginWithMicrosoft()
       const existing = await getProfile(user.uid)
-      if (existing?.profileComplete) {
+      if (isProfileComplete(existing)) {
         navigate('/dashboard')
       } else {
         navigate('/complete-profile', { state: { user: { uid: user.uid, displayName: user.displayName, email: user.email } } })
