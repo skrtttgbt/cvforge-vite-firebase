@@ -27,6 +27,7 @@ import {
 const includeOptions = [
   "About Me",
   "Technical Skills",
+  "Education",
   "Featured Projects",
   "Resume Download",
   "Certifications",
@@ -181,6 +182,7 @@ export default function WebPortfolio() {
           location: profile?.location || "",
           targetRole: profile?.targetRole || "",
           summary: profile?.summary || "",
+          imgUrl: profile?.imgUrl || "",
           education: profile?.education || null,
           experience: profile?.experience || [],
           skills: profile?.skills || [],
@@ -246,6 +248,63 @@ export default function WebPortfolio() {
     }
 
     setSaving(false);
+  };
+
+  const handlePublishPortfolio = () => {
+    if (!portfolioDraft || !userId) return;
+
+    const publicSlug = normalizePortfolioSlug(config.slug || profile?.fullName || userId);
+    const publicPath = `/portfolio/${publicSlug}`;
+    const publicUrl = `${window.location.origin}${publicPath}`;
+    const publicProfile = {
+      fullName: profile?.fullName || "",
+      email: profile?.email || "",
+      phone: profile?.phone || "",
+      location: profile?.location || "",
+      imgUrl: profile?.imgUrl || "",
+      education: profile?.education || null,
+      experience: profile?.experience || [],
+      skills: profile?.skills || [],
+      projects: profile?.projects || [],
+      certifications: profile?.certifications || [],
+    };
+
+    setSaving(true);
+    saveWebPortfolioDraft(userId, {
+      config: {
+        ...config,
+        slug: publicPath,
+        visibility: "Public",
+      },
+      draft: portfolioDraft,
+      publicProfile,
+      publicSources: profileSources,
+      publicSlug,
+      published: true,
+      publishedAt: new Date().toISOString(),
+    })
+      .then(() => {
+        setConfig((prev) => ({
+          ...prev,
+          slug: publicPath,
+          visibility: "Public",
+        }));
+
+        Swal.fire({
+          icon: "success",
+          title: "Portfolio Published",
+          html: `<p>Your portfolio is available at:</p><p><a href="${publicUrl}" target="_blank" rel="noreferrer">${publicUrl}</a></p>`,
+        });
+      })
+      .catch((error) => {
+        console.error("Error publishing portfolio:", error);
+        Swal.fire({
+          icon: "error",
+          title: "Publish Failed",
+          text: "Unable to publish your portfolio.",
+        });
+      })
+      .finally(() => setSaving(false));
   };
 
   const handleDownloadResumePdf = async () => {
@@ -428,7 +487,7 @@ export default function WebPortfolio() {
               {portfolioDraft ? "Regenerate" : "Generate First"}
             </Button>
 
-            <Button disabled={!portfolioDraft}>Publish Portfolio</Button>
+            <Button onClick={handlePublishPortfolio} disabled={saving || !portfolioDraft}>Publish Portfolio</Button>
           </div>
         </Card>
       </div>
@@ -442,7 +501,7 @@ export default function WebPortfolio() {
   );
 }
 
-function PortfolioPreview({
+export function PortfolioPreview({
   draft,
   profile,
   profileSources,
@@ -472,9 +531,12 @@ function PortfolioPreview({
   const projects = portfolio.projects || profile?.projects || [];
   const certifications =
     portfolio.certifications || profile?.certifications || [];
+  const educationItems = normalizeEducation(portfolio.education || profile?.education);
 
   const email = profile?.email || portfolio.contact?.email || "";
   const phone = profile?.phone || portfolio.contact?.phone || "";
+  const location = profile?.location || portfolio.contact?.location || "";
+  const imageUrl = profile?.imgUrl || portfolio.imgUrl || profile?.photoURL || "";
 
   const connectedSources = (profileSources || []).filter(
     (source) => source.url && source.url.trim()
@@ -488,6 +550,7 @@ function PortfolioPreview({
         <div className="hidden gap-5 sm:flex">
           <a href="#about" className="cursor-pointer hover:text-forge">About</a>
           <a href="#skills" className="cursor-pointer hover:text-forge">Skills</a>
+          <a href="#education" className="cursor-pointer hover:text-forge">Education</a>
           <a href="#projects" className="cursor-pointer hover:text-forge">Projects</a>
           <a href="#certs" className="cursor-pointer hover:text-forge">Certificates</a>
           <a href="#links" className="cursor-pointer hover:text-forge">Links</a>
@@ -504,6 +567,12 @@ function PortfolioPreview({
           <p className="mt-1 font-bold text-forge">{targetRole}</p>
 
           <p className="mt-4 text-slate-600">{about}</p>
+
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
+            {email && <a href={`mailto:${email}`} className="hover:text-forge">{email}</a>}
+            {phone && <a href={`tel:${phone}`} className="hover:text-forge">{phone}</a>}
+            {location && <span>{location}</span>}
+          </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
             <Button
@@ -522,7 +591,10 @@ function PortfolioPreview({
         </div>
 
         <div className="grid place-items-center">
-          <div className="grid h-40 w-40 place-items-center rounded-full bg-white text-7xl shadow-soft">
+          <div
+            className={`grid h-40 w-40 place-items-center rounded-full bg-white bg-cover bg-center text-7xl shadow-soft ${imageUrl ? "text-transparent" : ""}`}
+            style={imageUrl ? { backgroundImage: `url(${imageUrl})` } : undefined}
+          >
             👨‍💻
           </div>
         </div>
@@ -589,6 +661,10 @@ function PortfolioPreview({
 
         <div id="skills">
           <Mini title="Technical Skills" text={formatSkills(skills)} />
+        </div>
+
+        <div id="education">
+          <Mini title="Education" text={formatEducation(educationItems)} />
         </div>
 
         <div id="projects">
@@ -707,6 +783,33 @@ function formatCertificates(certifications = []) {
     .join(", ");
 }
 
+function normalizePortfolioSlug(value) {
+  const raw = String(value || "")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/^cvforge\.app\//i, "")
+    .replace(/^\/?portfolio\//i, "");
+
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60) || "portfolio";
+}
+
+function formatEducation(educationItems = []) {
+  return educationItems
+    .map((item) => {
+      const degree = item.degree || "Education";
+      const school = item.school ? ` at ${item.school}` : "";
+      const year = item.year ? ` (${item.year})` : "";
+
+      return `${degree}${school}${year}`;
+    })
+    .filter(Boolean)
+    .join(", ");
+}
+
 function formatContact(email, phone, sources = []) {
   return [
     email ? `Email: ${email}` : "",
@@ -715,4 +818,62 @@ function formatContact(email, phone, sources = []) {
   ]
     .filter(Boolean)
     .join(", ");
+}
+
+function normalizeEducation(education) {
+  if (!education) return [];
+
+  if (Array.isArray(education)) {
+    return education.map((item) => ({
+      degree: item.degree || item.course || item.level || "Education",
+      school: item.school || item.schoolName || "",
+      year:
+        item.year ||
+        item.yearGraduated ||
+        [item.startYear, item.endYear].filter(Boolean).join(" - "),
+    }));
+  }
+
+  const result = [];
+
+  if (education.primary?.schoolName) {
+    result.push({
+      degree: "Primary Education",
+      school: education.primary.schoolName,
+      year: education.primary.yearGraduated || "",
+    });
+  }
+
+  if (education.secondary?.schoolName) {
+    result.push({
+      degree: "Secondary Education",
+      school: education.secondary.schoolName,
+      year: education.secondary.yearGraduated || "",
+    });
+  }
+
+  const groups = [
+    ["College", education.college],
+    ["Vocational", education.vocational],
+    ["Master's Degree", education.masters],
+    ["Doctoral Degree", education.doctoral],
+  ];
+
+  groups.forEach(([label, items]) => {
+    if (!Array.isArray(items)) return;
+
+    items.forEach((item) => {
+      result.push({
+        degree: item.degreeProgram || item.degree || item.course || label,
+        school: item.schoolName || item.institution || item.university || item.school || "",
+        year:
+          item.yearGraduated ||
+          item.completionYear ||
+          item.year ||
+          [item.startYear, item.endYear].filter(Boolean).join(" - "),
+      });
+    });
+  });
+
+  return result;
 }

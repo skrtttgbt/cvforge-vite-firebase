@@ -1,11 +1,26 @@
+import { useRef, useState } from "react";
+import { Upload, UserRound } from "lucide-react";
 import Card from "../../Card";
 import FormField from "../../FormField";
 import Button from "../../Button";
-import { useState } from "react";
 import { mobileError, normalizePhilippineMobile } from "../../../utils/profileValidation";
 
-export default function PersonalInformationTab({ form, isEditing, onChange }) {
+export default function PersonalInformationTab({
+  form,
+  isEditing,
+  onChange,
+  onPhotoUpload,
+  uploadingPhoto = false,
+}) {
   const [phoneTouched, setPhoneTouched] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleFileChange = (event) => {
+    const file = event.target.files?.[0];
+    if (file) onPhotoUpload(file);
+    event.target.value = "";
+  };
+
   return (
     <div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
       <Card title="Personal Information">
@@ -50,29 +65,42 @@ export default function PersonalInformationTab({ form, isEditing, onChange }) {
             onChange={onChange}
             disabled={!isEditing}
           />
-
-</div>
-
-        <div className="mt-4">
-          <FormField
-            label="Professional Summary"
-            as="textarea"
-            name="summary"
-            value={form.summary}
-            onChange={onChange}
-            disabled={!isEditing}
-          />
         </div>
       </Card>
 
       <div className="grid gap-5">
         <Card title="Profile Photo">
           <div className="grid place-items-center gap-4">
-            <div className="grid h-40 w-40 place-items-center rounded-full bg-blue-100 text-7xl">
-              👨‍💻
+            <div className="grid h-40 w-40 place-items-center overflow-hidden rounded-full bg-blue-100 text-forge">
+              {form.imgUrl ? (
+                <img
+                  src={form.imgUrl}
+                  alt={form.fullName ? `${form.fullName} profile` : "Profile"}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <UserRound aria-hidden="true" className="h-20 w-20" />
+              )}
             </div>
 
-            <Button variant="outline">Change Photo</Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={!isEditing || uploadingPhoto}
+            />
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!isEditing || uploadingPhoto}
+            >
+              <Upload aria-hidden="true" className="h-4 w-4" />
+              {uploadingPhoto ? "Uploading..." : form.imgUrl ? "Change Photo" : "Upload Photo"}
+            </Button>
 
             <p className="text-sm text-slate-500">JPG, PNG Max. 2MB</p>
           </div>

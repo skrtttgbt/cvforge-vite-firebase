@@ -14,6 +14,7 @@ import CertificationsTab from "../components/profile/tabs/CertificationsTab";
 
 import { onAuthChange } from "../services/authservice";
 import { getProfile, saveProfile } from "../services/firestoreService";
+import { uploadProfilePhoto } from "../services/storageService";
 
 const tabs = [
   "Personal Information",
@@ -23,6 +24,7 @@ const tabs = [
   "Projects",
   "Certifications",
 ];
+const requiredTabs = ["Personal Information", "Education", "Skills"];
 
 const defaultEducation = {
   primary: {
@@ -44,7 +46,7 @@ const defaultForm = {
   email: "",
   phone: "",
   location: "",
-  summary: "",
+  imgUrl: "",
 
   education: defaultEducation,
   experience: [],
@@ -57,6 +59,7 @@ export default function ProfileManagement({ setup = false }) {
   const Layout = setup ? ProfileSetupLayout : AppLayout;
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
   const [loadError, setLoadError] = useState("");
   const [userId, setUserId] = useState(null);
@@ -87,7 +90,7 @@ export default function ProfileManagement({ setup = false }) {
             email: profile.email || user.email || "",
             phone: profile.phone || "",
             location: profile.location || "",
-            summary: profile.summary || "",
+            imgUrl: profile.imgUrl || profile.photoURL || "",
 
             education: {
               ...defaultEducation,
@@ -145,6 +148,43 @@ export default function ProfileManagement({ setup = false }) {
       ...prev,
       [e.target.name]: e.target.value,
     }));
+  };
+
+  const handlePhotoUpload = async (file) => {
+    if (!file || uploadingPhoto || !userId) return;
+
+    setUploadingPhoto(true);
+    try {
+      const imgUrl = await uploadProfilePhoto(userId, file);
+      await saveProfile(userId, { imgUrl });
+      setForm((prev) => ({
+        ...prev,
+        imgUrl,
+      }));
+      setOriginalForm((prev) => ({
+        ...prev,
+        imgUrl,
+      }));
+      window.dispatchEvent(new Event('profile-saved'));
+
+      Swal.fire({
+        toast: true,
+        position: "top-end",
+        icon: "success",
+        title: "Photo uploaded",
+        showConfirmButton: false,
+        timer: 1500,
+      });
+    } catch (error) {
+      console.error(error);
+      Swal.fire({
+        icon: "error",
+        title: "Upload Failed",
+        text: error.message || "Unable to upload your profile photo.",
+      });
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const handleSave = async () => {
@@ -552,7 +592,7 @@ export default function ProfileManagement({ setup = false }) {
       {incompleteSections.length > 0 && (
         <div className="m-5 rounded-xl border border-blue-200 bg-blue-50 p-4">
           <h2 className="font-bold text-ink">Complete your profile</h2>
-          <p className="mt-1 text-sm text-slate-600">{tabs.length - incompleteSections.length} of {tabs.length} sections complete. Fill in the remaining sections below.</p>
+          <p className="mt-1 text-sm text-slate-600">{requiredTabs.length - incompleteSections.length} of {requiredTabs.length} required sections complete. Fill in the remaining sections below.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {incompleteSections.map(tab => <Button key={tab} variant="outline" onClick={() => { setActiveTab(tab); setIsEditing(true); }}>{tab}</Button>)}
           </div>
@@ -620,8 +660,10 @@ export default function ProfileManagement({ setup = false }) {
       {activeTab === "Personal Information" && (
         <PersonalInformationTab
           form={form}
-          isEditing={isEditing && !saving}
+          isEditing={isEditing && !saving && !uploadingPhoto}
           onChange={handleChange}
+          onPhotoUpload={handlePhotoUpload}
+          uploadingPhoto={uploadingPhoto}
         />
       )}
 

@@ -7,6 +7,7 @@ import {
   serverTimestamp,
   query,
   where,
+  limit,
   getDocs,
   deleteDoc,
   increment,
@@ -31,6 +32,7 @@ export async function saveProfile(userId, profileData) {
     {
       ...profileData,
       uid: userId,
+      userId,
       updatedAt: serverTimestamp(),
     },
     {
@@ -54,6 +56,7 @@ export async function saveProfileSources(userId, data) {
     doc(db, "profileSources", userId),
     {
       ...data,
+      userId,
       updatedAt: serverTimestamp(),
     },
     { merge: true }
@@ -99,6 +102,7 @@ export async function saveWebPortfolioDraft(userId, data) {
   await setDoc(
     doc(db, "webPortfolioDrafts", userId),
     {
+      userId,
       ...data,
       updatedAt: serverTimestamp(),
     },
@@ -114,6 +118,26 @@ export async function getWebPortfolioDraft(userId) {
   const snap = await getDoc(doc(db, "webPortfolioDrafts", userId));
 
   return snap.exists() ? snap.data() : null;
+}
+
+export async function getPublishedWebPortfolio(publicSlug) {
+  if (!isConfigured || !publicSlug) return null;
+
+  const q = query(
+    collection(db, "webPortfolioDrafts"),
+    where("published", "==", true),
+    where("publicSlug", "==", publicSlug),
+    limit(1)
+  );
+
+  const snap = await getDocs(q);
+
+  return snap.empty
+    ? null
+    : {
+        id: snap.docs[0].id,
+        ...snap.docs[0].data(),
+      };
 }
 
 export async function saveInterviewSession(userId, data) {

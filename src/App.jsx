@@ -8,6 +8,7 @@ import ProfileManagement from "./pages/ProfileManagement";
 import ProfileSources from "./pages/ProfileSources";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import WebPortfolio from "./pages/WebPortfolio";
+import PublicPortfolio from "./pages/PublicPortfolio";
 import InterviewPreparation from "./pages/InterviewPreparation";
 import TokenManagement from "./pages/TokenManagement";
 import AccessToken from "./pages/AccessToken";
@@ -32,6 +33,7 @@ export default function App() {
       <Route path="/access-token" element={<AccessToken />} />
       <Route path="/access-token/:tokenValue" element={<AccessToken />} />
       <Route path="/shared-profile/:userId" element={<SharedProfile />} />
+      <Route path="/portfolio/:slug" element={<PublicPortfolio />} />
       <Route path="/employer" element={<EmployerDashboard />} />
 
       {/* Protected job seeker routes */}

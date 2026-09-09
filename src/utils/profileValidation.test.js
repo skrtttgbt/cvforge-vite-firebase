@@ -73,24 +73,28 @@ test("Philippine mobile formats normalize consistently", () => {
   }
 });
 
-test("completion ignores stale flags and does not require target role", () => {
+test("completion ignores stale flags and does not require optional sections", () => {
   assert.equal(isProfileComplete(complete()), true);
   assert.equal(
     isProfileComplete({ profileComplete: true, targetRole: "Developer" }),
     false,
   );
-  assert.equal(getIncompleteSections(null).length, 6);
+  assert.equal(getIncompleteSections(null).length, 3);
   for (const [key, tab] of [
     ["education", "Education"],
-    ["experience", "Experience"],
     ["skills", "Skills"],
-    ["projects", "Projects"],
-    ["certifications", "Certifications"],
   ]) {
     const profile = complete();
     delete profile[key];
     assert.deepEqual(getIncompleteSections(profile), [tab]);
   }
+
+  const optionalOnlyMissing = complete();
+  optionalOnlyMissing.experience = [];
+  optionalOnlyMissing.projects = [];
+  optionalOnlyMissing.certifications = [];
+  assert.deepEqual(getIncompleteSections(optionalOnlyMissing), []);
+  assert.equal(isProfileComplete(optionalOnlyMissing), true);
 });
 
 test("blank entries and invalid partial education are incomplete", () => {
@@ -105,8 +109,7 @@ test("blank entries and invalid partial education are incomplete", () => {
 
 test("valid partial profiles can save progress without being complete", () => {
   const profile = complete();
-  profile.experience = [];
-  profile.certifications = [];
+  profile.skills = [];
   assert.deepEqual(validateProfile(profile), []);
   assert.equal(isProfileComplete(profile), false);
 });

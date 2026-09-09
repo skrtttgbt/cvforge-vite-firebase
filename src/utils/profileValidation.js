@@ -27,6 +27,7 @@ const sections = {
   projects: ["Projects", ["projectTitle", "role", "startDate"]],
   certifications: ["Certifications", ["name", "organization", "issueDate"]],
 };
+const requiredListSections = new Set(["skills"]);
 
 export function validateProfile(profile = {}) {
   const errors = [];
@@ -103,6 +104,7 @@ export function getIncompleteSections(profile = {}) {
   });
   if (!education) invalid.add("Education");
   for (const [key, [tab]] of Object.entries(sections)) {
+    if (!requiredListSections.has(key)) continue;
     if (!list(profile[key]).length) invalid.add(tab);
   }
   return [
