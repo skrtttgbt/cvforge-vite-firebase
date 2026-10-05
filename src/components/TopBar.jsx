@@ -67,15 +67,6 @@ export default function TopBar({ title, subtitle, badge, employer = false }) {
         </div>
 
         <div className="flex items-center gap-4">
-          {!employer && (
-            <button
-              type="button"
-              className="rounded-full border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
-            >
-              <Bell size={18} />
-            </button>
-          )}
-
           <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
             {profile?.imgUrl ? (
               <img

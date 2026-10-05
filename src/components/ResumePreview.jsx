@@ -10,8 +10,10 @@ export default function ResumePreview({ profile = {}, draft = null }) {
     );
   }
 
-  const resume = draft.resume || buildResumeFromProfile(profile, draft);
-  console.log("Generated Resume:", resume);
+  const resume = mergeResumeWithProfile(
+    buildResumeFromProfile(profile, draft),
+    draft.resume || {},
+  );
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm leading-relaxed text-slate-700">
       <header className="border-b border-slate-200 pb-4 text-center">
@@ -212,12 +214,72 @@ function buildResumeFromProfile(profile = {}, draft = {}) {
       location: profile.location || "",
     },
     professionalSummary: draft.content || profile.summary || "",
-    technicalSkills: groupSkills(profile.skills || []),
+    technicalSkills: profile.skills || [],
     workExperience: profile.experience || [],
     projects: profile.projects || [],
     certifications: profile.certifications || [],
     education: flattenEducation(profile.education || {}),
   };
+}
+
+function mergeResumeWithProfile(profileResume, generatedResume) {
+  return {
+    ...profileResume,
+    ...compactObject(generatedResume),
+    contact: {
+      ...profileResume.contact,
+      ...compactObject(generatedResume.contact || {}),
+    },
+    professionalSummary:
+      generatedResume.professionalSummary ||
+      profileResume.professionalSummary,
+    technicalSkills: mergeList(
+      profileResume.technicalSkills,
+      generatedResume.technicalSkills,
+    ),
+    workExperience: mergeList(
+      profileResume.workExperience,
+      generatedResume.workExperience,
+    ),
+    projects: mergeList(profileResume.projects, generatedResume.projects),
+    certifications: mergeList(
+      profileResume.certifications,
+      generatedResume.certifications,
+    ),
+    education: mergeList(profileResume.education, generatedResume.education),
+  };
+}
+
+function mergeList(profileList = [], generatedList = []) {
+  if (!Array.isArray(generatedList) || generatedList.length === 0) {
+    return profileList;
+  }
+
+  const maxLength = Math.max(profileList.length, generatedList.length);
+
+  return Array.from({ length: maxLength }, (_, index) =>
+    mergeItem(profileList[index], generatedList[index]),
+  ).filter(Boolean);
+}
+
+function mergeItem(profileItem, generatedItem) {
+  if (!generatedItem) return profileItem;
+  if (!profileItem || typeof generatedItem !== "object") return generatedItem;
+
+  return {
+    ...profileItem,
+    ...compactObject(generatedItem),
+  };
+}
+
+function compactObject(value) {
+  if (!value || typeof value !== "object") return {};
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) =>
+      Array.isArray(item) ? item.length > 0 : item !== undefined && item !== null && item !== "",
+    ),
+  );
 }
 
 function groupSkills(skills) {

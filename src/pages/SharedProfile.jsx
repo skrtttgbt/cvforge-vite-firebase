@@ -58,6 +58,8 @@ export default function SharedProfile() {
   const fullName = resume?.fullName || profile?.fullName || "Unnamed Candidate";
   const targetRole =
     resume?.targetRole || profile?.targetRole || "Target ICT Role";
+  const imageUrl =
+    profile?.imgUrl || profile?.photoURL || resume?.imgUrl || resume?.photoURL || "";
 
   const contact = resume?.contact || {};
 
@@ -191,10 +193,17 @@ export default function SharedProfile() {
         <div className="grid gap-5 xl:grid-cols-[1.6fr_0.9fr] print:block">
           <Card>
             <div className="flex flex-col gap-6 md:flex-row">
-              <div className="grid h-32 w-32 shrink-0 place-items-center rounded-full bg-blue-100 text-6xl print:hidden">
-                👨‍💻
-              </div>
-
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={`${fullName} profile`}
+                  className="h-32 w-32 shrink-0 rounded-full border border-slate-200 object-cover print:hidden"
+                />
+              ) : (
+                <div className="grid h-32 w-32 shrink-0 place-items-center rounded-full bg-blue-100 text-3xl font-extrabold text-forge print:hidden">
+                  {getInitials(fullName)}
+                </div>
+              )}
               <div className="flex-1">
                 <h1 className="text-3xl font-extrabold text-ink">
                   {fullName}
@@ -391,14 +400,14 @@ export default function SharedProfile() {
                   No profile links shared yet.
                 </p>
               ) : (
-                <div className="flex flex-wrap gap-2">
+                <div className="grid gap-3 sm:grid-cols-2">
                   {connectedSources.map((source) => (
                     <a
                       key={source.name}
-                      href={source.url}
+                      href={formatUrl(source.url)}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full border border-slate-200 px-3 py-1 text-sm font-bold text-forge hover:bg-blue-50"
+                      className="rounded-lg border border-slate-200 bg-white p-3 text-sm font-bold text-forge hover:bg-blue-50"
                     >
                       {source.name} ↗
                     </a>
@@ -427,6 +436,25 @@ function Info({ label, value }) {
       <b className="text-right text-ink">{value || "Not specified"}</b>
     </div>
   );
+}
+
+function getInitials(name) {
+  return String(name || "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "CV";
+}
+
+function formatUrl(url) {
+  if (!url) return "#";
+
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+
+  return `https://${url}`;
 }
 
 function normalizeEducation(education) {
@@ -581,7 +609,6 @@ function normalizeCertifications(certifications) {
     };
   });
 }
-
 function formatDate(value) {
   if (!value) return "Not recorded";
 
@@ -589,7 +616,7 @@ function formatDate(value) {
 
   if (Number.isNaN(date.getTime())) return "Not recorded";
 
-  return date.toLocaleDateString();
+  return date.toLocaleDateString(undefined, { dateStyle: "long" });
 }
 
 function formatDateRange(startDate, endDate) {

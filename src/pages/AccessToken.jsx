@@ -76,6 +76,8 @@ export default function AccessToken() {
           expiresAt: token.expiresAt,
           status: token.status || "Active",
           shareLink: token.shareLink,
+          profileSources: token.profileSources || [],
+          portfolioUrl: token.portfolioUrl || "",
         });
 
         await incrementTokenViews(token.id);

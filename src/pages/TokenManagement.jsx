@@ -8,6 +8,8 @@ import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
   getProfile,
+  getProfileSources,
+  getWebPortfolioDraft,
   createToken,
   getTokensByOwner,
   revokeToken,
@@ -138,6 +140,14 @@ export default function TokenManagement() {
     try {
       const tokenValue = crypto.randomUUID();
       const expiresAt = getExpirationDate(form.expiration);
+      const [savedSources, savedPortfolio] = await Promise.all([
+        getProfileSources(userId),
+        getWebPortfolioDraft(userId),
+      ]);
+      const profileSources = (savedSources?.sources || []).filter(
+        (source) => source.url && source.url.trim()
+      );
+      const portfolioUrl = getPublishedPortfolioUrl(savedPortfolio);
 
       const tokenData = {
         tokenValue,
@@ -153,6 +163,8 @@ export default function TokenManagement() {
         views: 0,
         allowDownload: form.allowDownload,
         shareLink: `${window.location.origin}/access-token/${tokenValue}`,
+        profileSources,
+        portfolioUrl,
       };
 
       const savedToken = await createToken(userId, tokenData);
@@ -672,4 +684,20 @@ function getTokenStatus(token) {
   }
 
   return token.status || "Active";
+}
+
+function getPublishedPortfolioUrl(portfolio) {
+  if (!portfolio?.published) return "";
+
+  if (portfolio.publicUrl) return portfolio.publicUrl;
+
+  if (portfolio.publicPath) {
+    return `${window.location.origin}${portfolio.publicPath}`;
+  }
+
+  if (portfolio.publicSlug) {
+    return `${window.location.origin}/portfolio/${portfolio.publicSlug}`;
+  }
+
+  return "";
 }

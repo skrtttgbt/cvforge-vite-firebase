@@ -2,11 +2,14 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
+  verifyPasswordResetCode,
+  confirmPasswordReset 
 } from "firebase/auth";
 
 import {
@@ -22,6 +25,14 @@ async function applyPersistence(remember = true) {
       ? browserLocalPersistence
       : browserSessionPersistence
   );
+}
+export function verifyResetCode(oobCode) {
+  return verifyPasswordResetCode(auth, oobCode);
+}
+ 
+// Sets the new password using the same oobCode.
+export function confirmReset(oobCode, newPassword) {
+  return confirmPasswordReset(auth, oobCode, newPassword);
 }
 
 function normalizeEmail(email) {
@@ -58,6 +69,13 @@ export async function registerWithEmail(
   );
 
   return result.user;
+}
+
+export async function resetPassword(email) {
+  await sendPasswordResetEmail(
+    auth,
+    normalizeEmail(email)
+  );
 }
 
 export async function loginWithGoogle(remember = true) {

@@ -6,29 +6,25 @@ import StatusBadge from "../components/StatusBadge";
 import { onAuthChange } from "../services/authservice";
 import {
   getEmployerCandidateViews,
-  updateEmployerCandidateView,
+  getProfileSources,
+  getWebPortfolioDraft,
 } from "../services/firestoreService";
-import { Eye, RefreshCw, Star, Users, ShieldCheck } from "lucide-react";
+import { Download, FileText, Globe, Link2, RefreshCw, ShieldCheck } from "lucide-react";
 
 export default function EmployerDashboard() {
   const [employerId, setEmployerId] = useState(null);
   const [candidateViews, setCandidateViews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [updatingId, setUpdatingId] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const unsubscribe = onAuthChange(async (user) => {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      setEmployerId(user.uid);
+    const unsubscribe = onAuthChange(async () => {
+      const currentEmployerId = getEmployerVisitorId();
+      setEmployerId(currentEmployerId);
 
       try {
-        const views = await getEmployerCandidateViews(user.uid);
-        setCandidateViews(views || []);
+        const views = await getEmployerCandidateViews(currentEmployerId);
+        setCandidateViews(await enrichCandidateViews(views || []));
       } catch (error) {
         console.error("Employer dashboard load error:", error);
         setError("Failed to load employer dashboard data.");
@@ -41,20 +37,21 @@ export default function EmployerDashboard() {
   }, []);
 
   const stats = useMemo(() => {
-    const uniqueCandidates = new Set(
-      candidateViews.map((view) => view.tokenId || view.tokenValue)
-    );
-
     const activeTokens = candidateViews.filter(
       (view) => getAccessStatus(view) === "Active"
     );
 
-    const shortlisted = candidateViews.filter((view) => view.shortlisted);
+    const portfoliosAvailable = candidateViews.filter((view) =>
+      Boolean(getPortfolioUrl(view))
+    );
 
     return {
-      candidatesViewed: uniqueCandidates.size,
+      portfoliosAvailable: portfoliosAvailable.length,
       activeTokens: activeTokens.length,
-      shortlisted: shortlisted.length,
+      profileSources: candidateViews.reduce(
+        (total, view) => total + (view.profileSources?.length || 0),
+        0
+      ),
     };
   }, [candidateViews]);
 
@@ -63,30 +60,11 @@ export default function EmployerDashboard() {
 
     try {
       const views = await getEmployerCandidateViews(id);
-      setCandidateViews(views || []);
+      setCandidateViews(await enrichCandidateViews(views || []));
     } catch (error) {
       console.error("Refresh employer views error:", error);
       alert("Failed to refresh dashboard data.");
     }
-  };
-
-  const toggleShortlist = async (view) => {
-    if (!view?.id) return;
-
-    setUpdatingId(view.id);
-
-    try {
-      await updateEmployerCandidateView(view.id, {
-        shortlisted: !view.shortlisted,
-      });
-
-      await loadViews();
-    } catch (error) {
-      console.error("Shortlist update error:", error);
-      alert("Failed to update shortlist status.");
-    }
-
-    setUpdatingId(null);
   };
 
   if (loading) {
@@ -107,14 +85,14 @@ export default function EmployerDashboard() {
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Candidates Viewed</p>
+              <p className="text-sm text-slate-500">Web Portfolios</p>
               <p className="mt-2 text-3xl font-extrabold">
-                {stats.candidatesViewed}
+                {stats.portfoliosAvailable}
               </p>
             </div>
 
             <div className="grid h-11 w-11 place-items-center rounded-xl bg-blue-50 text-forge">
-              <Users size={22} />
+              <Globe size={22} />
             </div>
           </div>
         </Card>
@@ -137,21 +115,21 @@ export default function EmployerDashboard() {
         <Card>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Shortlisted</p>
+              <p className="text-sm text-slate-500">Profile Sources</p>
               <p className="mt-2 text-3xl font-extrabold">
-                {stats.shortlisted}
+                {stats.profileSources}
               </p>
             </div>
 
             <div className="grid h-11 w-11 place-items-center rounded-xl bg-yellow-50 text-yellow-700">
-              <Star size={22} />
+              <Link2 size={22} />
             </div>
           </div>
         </Card>
       </div>
 
       <Card
-        title="Viewed Candidates"
+        title="Candidate Access"
         className="mt-5 overflow-x-auto"
         right={
           <Button variant="outline" onClick={() => loadViews()}>
@@ -174,80 +152,165 @@ export default function EmployerDashboard() {
             </p>
           </div>
         ) : (
-          <table className="w-full min-w-[850px] text-left text-sm">
-            <thead>
-              <tr className="border-b text-slate-500">
-                <th className="py-3">Candidate</th>
-                <th>Role</th>
-                <th>Access Type</th>
-                <th>Viewed At</th>
-                <th>Status</th>
-                <th>Shortlisted</th>
-                <th>Action</th>
-              </tr>
-            </thead>
+          <div className="grid gap-4">
+            {candidateViews.map((view) => {
+              const resumeUrl = getResumeUrl(view);
+              const portfolioUrl = getPortfolioUrl(view);
 
-            <tbody>
-              {candidateViews.map((view) => (
-                <tr key={view.id} className="border-b last:border-0">
-                  <td className="py-3 font-bold">
-                    {view.candidateName || "Unnamed Candidate"}
-                  </td>
+              return (
+                <section
+                  key={view.id}
+                  className="rounded-lg border border-slate-200 bg-slate-50 p-4"
+                >
+                  <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 className="text-xl font-extrabold text-ink">
+                        {view.candidateName || "Unnamed Candidate"}
+                      </h3>
+                      <p className="font-bold text-forge">
+                        {view.candidateRole || "Target ICT Role"}
+                      </p>
+                      <p className="mt-2 text-sm text-slate-500">
+                        {view.accessType || "Token Access"} | Viewed {formatFirestoreDate(view.viewedAt)}
+                      </p>
+                    </div>
 
-                  <td>{view.candidateRole || "Target ICT Role"}</td>
-
-                  <td>{view.accessType || "Token Access"}</td>
-
-                  <td>{formatFirestoreDate(view.viewedAt)}</td>
-
-                  <td>
                     <StatusBadge status={getAccessStatus(view)} />
-                  </td>
+                  </div>
 
-                  <td>
-                    {view.shortlisted ? (
-                      <span className="font-bold text-yellow-700">Yes</span>
-                    ) : (
-                      <span className="text-slate-500">No</span>
-                    )}
-                  </td>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                      <div className="mb-3 flex items-center gap-2 font-bold text-ink">
+                        <Link2 size={16} />
+                        Profile Sources
+                      </div>
 
-                  <td>
-                    <div className="flex flex-wrap gap-2">
-                      {view.shareLink && (
+                      {view.profileSources?.length ? (
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {view.profileSources.map((source) => (
+                            <a
+                              key={`${view.id}-${source.name}`}
+                              href={formatUrl(source.url)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-forge hover:bg-blue-50"
+                            >
+                              {source.name}
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500">
+                          No profile sources available.
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="rounded-lg border border-slate-200 bg-white p-4">
+                      <div className="mb-3 font-bold text-ink">Actions</div>
+                      <div className="grid gap-2 ">
                         <Button
                           variant="outline"
-                          className="px-3 py-1.5"
-                          onClick={() => window.open(view.shareLink, "_blank")}
+                          className="px-3 py-2"
+                          disabled={!portfolioUrl}
+                          onClick={() => window.open(portfolioUrl, "_blank")}
                         >
-                          <Eye size={14} />
-                          View
+                          <Globe size={14} />
+                          View Portfolio
                         </Button>
-                      )}
 
-                      <Button
-                        variant={view.shortlisted ? "outline" : "default"}
-                        className="px-3 py-1.5"
-                        onClick={() => toggleShortlist(view)}
-                        disabled={updatingId === view.id}
-                      >
-                        <Star size={14} />
-                        {updatingId === view.id
-                          ? "Updating..."
-                          : view.shortlisted
-                          ? "Remove"
-                          : "Shortlist"}
-                      </Button>
+                        {/* <Button
+                          variant="outline"
+                          className="px-3 py-2"
+                          disabled={!resumeUrl}
+                          onClick={() => window.open(resumeUrl, "_blank")}
+                        >
+                          <FileText size={14} />
+                          View Resume
+                        </Button> */}
+
+                        <Button
+                          className="px-3 py-2"
+                          disabled={!resumeUrl}
+                          onClick={() => window.open(resumeUrl, "_blank")}
+                        >
+                          <Download size={14} />
+                          Download Resume
+                        </Button>
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         )}
       </Card>
     </AppLayout>
   );
+}
+
+async function enrichCandidateViews(views) {
+  return Promise.all(
+    views.map(async (view) => {
+      const existingSources = (view.profileSources || []).filter(
+        (source) => source.url && source.url.trim()
+      );
+      const existingPortfolioUrl = getPortfolioUrl(view);
+
+      if (!view.ownerId || (existingSources.length && existingPortfolioUrl)) {
+        return {
+          ...view,
+          profileSources: existingSources,
+          portfolioUrl: existingPortfolioUrl,
+        };
+      }
+
+      try {
+        const [savedSources, savedPortfolio] = await Promise.all([
+          getProfileSources(view.ownerId),
+          getWebPortfolioDraft(view.ownerId),
+        ]);
+
+        const profileSources = existingSources.length
+          ? existingSources
+          : (savedSources?.sources || []).filter(
+          (source) => source.url && source.url.trim()
+        );
+
+        return {
+          ...view,
+          profileSources,
+          portfolioUrl:
+            existingPortfolioUrl || getPublishedPortfolioUrl(savedPortfolio),
+        };
+      } catch (error) {
+        console.error("Candidate enrichment error:", error);
+        return view;
+      }
+    })
+  );
+}
+
+function getPublishedPortfolioUrl(portfolio) {
+  if (!portfolio?.published) return "";
+
+  if (portfolio.publicUrl) return portfolio.publicUrl;
+  if (portfolio.publicPath) return portfolio.publicPath;
+  if (portfolio.publicSlug) return `/portfolio/${portfolio.publicSlug}`;
+
+  return "";
+}
+
+function getPortfolioUrl(view) {
+  return view.portfolioUrl || "";
+}
+
+function getResumeUrl(view) {
+  if (view.shareLink) return view.shareLink;
+  if (view.ownerId) return `/shared-profile/${view.ownerId}`;
+
+  return "";
 }
 
 function getAccessStatus(view) {
@@ -274,4 +337,30 @@ function formatFirestoreDate(value) {
   if (Number.isNaN(date.getTime())) return "Invalid date";
 
   return date.toLocaleString();
+}
+
+function formatUrl(url) {
+  if (!url) return "#";
+
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+
+  return `https://${url}`;
+}
+
+function getEmployerVisitorId() {
+  const key = "cvforge_employer_visitor_id";
+  const existingId = localStorage.getItem(key);
+
+  if (existingId) return existingId;
+
+  const newId =
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? `employer-${crypto.randomUUID()}`
+      : `employer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  localStorage.setItem(key, newId);
+
+  return newId;
 }

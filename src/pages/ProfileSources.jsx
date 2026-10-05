@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
 import Button from "../components/Button";
@@ -64,12 +64,13 @@ const defaultSources = [
 ];
 
 export default function ProfileSources() {
+  const lastSavedSnapshotRef = useRef("");
   const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
   const [processingSource, setProcessingSource] = useState(null);
   const [sources, setSources] = useState(defaultSources);
-  const [notes, setNotes] = useState("");
 
   const profileLinks = useMemo(() => {
     return sources.filter((source) => source.url && source.url.trim());
@@ -87,10 +88,14 @@ export default function ProfileSources() {
       try {
         const savedSources = await getProfileSources(user.uid);
 
-        if (savedSources) {
-          setSources(normalizeSavedSources(savedSources.sources));
-          setNotes(savedSources.notes || "");
-        }
+        const normalizedSources = savedSources
+          ? normalizeSavedSources(savedSources.sources)
+          : defaultSources;
+
+        setSources(normalizedSources);
+        lastSavedSnapshotRef.current = JSON.stringify(
+          normalizeSourcesForSave(normalizedSources)
+        );
       } catch (error) {
         console.error("Error fetching profile sources:", error);
       }
@@ -100,6 +105,39 @@ export default function ProfileSources() {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!userId || loading) return undefined;
+
+    const sourcesToSave = normalizeSourcesForSave(sources);
+    const nextSnapshot = JSON.stringify(sourcesToSave);
+
+    if (nextSnapshot === lastSavedSnapshotRef.current) {
+      return undefined;
+    }
+
+    setSaving(true);
+    setSaveStatus("Saving...");
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        await saveProfileSources(userId, {
+          sources: sourcesToSave,
+          notes: "",
+        });
+
+        lastSavedSnapshotRef.current = nextSnapshot;
+        setSaveStatus("Saved");
+      } catch (error) {
+        console.error("Auto-save profile sources error:", error);
+        setSaveStatus("Unable to save");
+      } finally {
+        setSaving(false);
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [sources, userId, loading]);
 
   const handleSourceUrlChange = (index, value) => {
     setSources((prev) => {
@@ -217,83 +255,7 @@ export default function ProfileSources() {
     });
   };
 
-  const handleSaveSources = async () => {
-    if (!userId) {
-      Swal.fire({
-        icon: "warning",
-        title: "Login Required",
-        text: "You must be logged in to save sources.",
-      });
-      return;
-    }
-
-    // get only pending sources
-    const pendingSources = sources.filter((s) => s.status === "Pending");
-
-    if (pendingSources.length === 0) {
-      Swal.fire({
-        icon: "info",
-        title: "Nothing to Save",
-        text: "No new links to confirm.",
-      });
-      return;
-    }
-
-    const result = await Swal.fire({
-      title: "Confirm Sources",
-      html: `
-        <p>You are about to save the following:</p>
-        <ul style="text-align:left;margin-top:10px;">
-          ${pendingSources
-            .map((s) => `<li><b>${s.name}</b></li>`)
-            .join("")}
-        </ul>
-      `,
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Confirm Save",
-    });
-
-    if (!result.isConfirmed) return;
-
-    setSaving(true);
-
-    try {
-      // simulate save
-      await saveProfileSources(userId, {
-        sources,
-        notes,
-      });
-
       // mark only pending → connected
-      setSources((prev) =>
-        prev.map((s) =>
-          s.status === "Pending"
-            ? { ...s, status: "Connected" }
-            : s
-        )
-      );
-
-      Swal.fire({
-        icon: "success",
-        title: "Saved",
-        text: "Your profile sources have been confirmed.",
-        timer: 2000,
-        showConfirmButton: false,
-      });
-    } catch (error) {
-      console.error(error);
-
-      Swal.fire({
-        icon: "error",
-        title: "Save Failed",
-        text: "Failed to save profile sources.",
-      });
-    }
-
-    setSaving(false);
-  };
-
   if (loading) {
     return (
       <AppLayout title="Profile Source Input">
@@ -362,7 +324,17 @@ export default function ProfileSources() {
         ))}
       </div>
 
-      <Card className="mt-5" title="Profile Links">
+      <Card
+        className="mt-5"
+        title="Profile Links"
+        right={
+          saveStatus ? (
+            <span className={`text-xs font-bold ${saveStatus === "Unable to save" ? "text-red-600" : "text-slate-500"}`}>
+              {saving ? "Saving..." : saveStatus}
+            </span>
+          ) : null
+        }
+      >
         {profileLinks.length === 0 ? (
           <p className="text-sm text-slate-500">
             No profile links added yet. Add a URL above to show it here.
@@ -385,23 +357,16 @@ export default function ProfileSources() {
         )}
       </Card>
 
-      <Card className="mt-5" title="Additional Notes / Imported Content">
-        <FormField
-          label=""
-          as="textarea"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Add any additional notes, context, or paste imported content here..."
-        />
-
-        <div className="mt-4">
-          <Button onClick={handleSaveSources} disabled={saving}>
-            {saving ? "Saving..." : "Save Sources"}
-          </Button>
-        </div>
-      </Card>
     </AppLayout>
   );
+}
+
+function normalizeSourcesForSave(sources) {
+  return sources.map((source) => ({
+    ...source,
+    url: source.url || "",
+    status: source.url?.trim() ? source.status : "Disconnected",
+  }));
 }
 
 function normalizeSavedSources(savedSources) {
@@ -416,15 +381,17 @@ function normalizeSavedSources(savedSources) {
 
     const url = savedSource.url || "";
 
+    const savedStatus = ["Pending", "Connected", "Imported"].includes(
+      savedSource.status
+    )
+      ? savedSource.status
+      : "Connected";
+
     return {
       ...defaultSource,
       ...savedSource,
       url,
-      status: url.trim()
-        ? savedSource.status === "Imported"
-          ? "Imported"
-          : "Connected"
-        : "Disconnected",
+      status: url.trim() ? savedStatus : "Disconnected",
     };
   });
 }

@@ -5,24 +5,49 @@ import Button from '../components/Button'
 import { FileText, Globe, MessageSquare, ShieldCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { onAuthChange } from '../services/authservice'
-import { getProfile } from '../services/firestoreService'
+import {
+  getProfile,
+  getProfileSources,
+  getResumeDraft,
+  getTokensByOwner,
+} from '../services/firestoreService'
+import { getIncompleteSections } from '../utils/profileValidation'
 
 export default function Dashboard() {
   const [profile, setProfile] = useState(null)
+  const [dashboardStats, setDashboardStats] = useState({
+    profileCompletion: '0%',
+    sourcesConnected: '0 / 8',
+    resumeDrafts: '0',
+    activeTokens: '0',
+  })
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
+
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
       try {
         if (!user) {
           setProfile(null)
+          setDashboardStats({
+            profileCompletion: '0%',
+            sourcesConnected: '0 / 8',
+            resumeDrafts: '0',
+            activeTokens: '0',
+          })
           setLoading(false)
           return
         }
 
-        const data = await getProfile(user.uid)
+        const [data, savedSources, savedDraft, savedTokens] = await Promise.all([
+          getProfile(user.uid),
+          getProfileSources(user.uid),
+          getResumeDraft(user.uid),
+          getTokensByOwner(user.uid),
+        ])
 
         setProfile(data)
+        setDashboardStats(buildDashboardStats(data, savedSources, savedDraft, savedTokens))
       } catch (error) {
         console.error('Error loading profile:', error)
       } finally {
@@ -34,10 +59,10 @@ export default function Dashboard() {
   }, [])
 
   const stats = [
-    ['Profile Completion', profile?.completion || '0%'],
-    ['Sources Connected', profile?.sourcesConnected || '0 / 8'],
-    ['Resume Drafts', profile?.resumeDrafts || '0'],
-    ['Active Tokens', profile?.activeTokens || '0'],
+    ['Profile Completion', dashboardStats.profileCompletion],
+    ['Sources Connected', dashboardStats.sourcesConnected],
+    ['Resume Drafts', dashboardStats.resumeDrafts],
+    ['Active Tokens', dashboardStats.activeTokens],
   ]
 
   if (loading) {
@@ -125,4 +150,43 @@ export default function Dashboard() {
       </div>
     </AppLayout>
   )
+}
+
+function buildDashboardStats(profile, savedSources, savedDraft, savedTokens) {
+  const totalSections = 6
+  const incompleteSections = getIncompleteSections(profile || {})
+  const completedSections = Math.max(totalSections - incompleteSections.length, 0)
+  const profileCompletion = `${Math.round((completedSections / totalSections) * 100)}%`
+
+  const sources = Array.isArray(savedSources?.sources) ? savedSources.sources : []
+  const connectedSources = sources.filter((source) =>
+    ['Connected', 'Imported'].includes(source.status)
+  ).length
+  const totalSources = sources.length || 8
+
+  const resumeDrafts = savedDraft?.draft || savedDraft?.resume ? '1' : '0'
+  const activeTokens = (savedTokens || []).filter(isActiveToken).length.toString()
+
+  return {
+    profileCompletion,
+    sourcesConnected: `${connectedSources} / ${totalSources}`,
+    resumeDrafts,
+    activeTokens,
+  }
+}
+
+function isActiveToken(token) {
+  if (!token || token.status === 'Revoked') return false
+
+  const expiresAt = token.expiresAt?.toDate?.() || (token.expiresAt ? new Date(token.expiresAt) : null)
+
+  if (expiresAt && !Number.isNaN(expiresAt.getTime()) && expiresAt < new Date()) {
+    return false
+  }
+
+  if (token.maxViews && (token.views || 0) >= token.maxViews) {
+    return false
+  }
+
+  return (token.status || 'Active') === 'Active'
 }

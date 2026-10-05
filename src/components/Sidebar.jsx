@@ -69,7 +69,9 @@ export default function Sidebar({ employer = false }) {
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-gradient-to-b from-navy to-navy2 text-white lg:flex">
       <div className="px-7 py-6">
-        <Logo dark />
+        <div className="flex items-center justify-center gap-3">
+          <Logo dark />
+        </div>
       </div>
 
       <nav className="flex-1 space-y-1 px-4">

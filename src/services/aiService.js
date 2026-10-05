@@ -86,11 +86,12 @@ export async function generateAIContent(type, payload = {}) {
       professionalSummary:
         payload?.profile?.summary ||
         `Draft generated for ${payload?.targetRole || "Full Stack Developer"}.`,
-      technicalSkills: [],
-      workExperience: [],
-      projects: [],
-      certifications: [],
-      education: [],
+      targetRole: payload?.targetRole || payload?.profile?.targetRole || "",
+      technicalSkills: payload?.profile?.skills || [],
+      workExperience: payload?.profile?.experience || [],
+      projects: payload?.profile?.projects || [],
+      certifications: payload?.profile?.certifications || [],
+      education: flattenEducation(payload?.profile?.education || {}),
     },
     content: "",
     bullets: [],
@@ -111,9 +112,11 @@ The resume should:
 2. Rewrite job descriptions to emphasize achievements relevant to the target role.
 3. Rewrite project descriptions to highlight relevant skills and responsibilities.
 4. Use the tone specified (Professional, Confident, Concise, Modern, Academic).
-5. Include the sections specified in Include Sections.
+5. Include all applicant information available in the raw profile data by default.
 6. Do NOT invent companies, schools, certificates, dates, or links.
 7. Output only valid JSON (no markdown, no bullets, no asterisks).
+8. If a section has data in the raw profile, include it in the matching resume section.
+9. Preserve applicant contact details, education, skills, experience, projects, certifications, dates, and links.
 
 Raw profile data:
 ${JSON.stringify(payload.profile || {}, null, 2)}
@@ -139,6 +142,68 @@ Return JSON in this structure:
   }
 }
 `;
+}
+
+function flattenEducation(education = {}) {
+  const list = [];
+
+  if (education.masters?.length) {
+    education.masters.forEach((item) => {
+      list.push({
+        degree: item.degree || "Masteral Degree",
+        school: item.university || "",
+        year: item.yearGraduated || "",
+      });
+    });
+  }
+
+  if (education.doctoral?.length) {
+    education.doctoral.forEach((item) => {
+      list.push({
+        degree: item.degree || "Doctoral Degree",
+        school: item.university || "",
+        year: item.yearGraduated || "",
+      });
+    });
+  }
+
+  if (education.college?.length) {
+    education.college.forEach((item) => {
+      list.push({
+        degree: item.degreeProgram || "College Degree",
+        school: item.schoolName || "",
+        year: item.yearGraduated || "",
+      });
+    });
+  }
+
+  if (education.vocational?.length) {
+    education.vocational.forEach((item) => {
+      list.push({
+        degree: item.course || "Vocational / Technical Education",
+        school: item.institution || "",
+        year: item.completionYear || "",
+      });
+    });
+  }
+
+  if (education.secondary?.schoolName || education.secondary?.yearGraduated) {
+    list.push({
+      degree: "Secondary Education",
+      school: education.secondary?.schoolName || "",
+      year: education.secondary?.yearGraduated || "",
+    });
+  }
+
+  if (education.primary?.schoolName || education.primary?.yearGraduated) {
+    list.push({
+      degree: "Primary Education",
+      school: education.primary?.schoolName || "",
+      year: education.primary?.yearGraduated || "",
+    });
+  }
+
+  return list;
 }
 export async function generateInterviewAI(type, payload = {}) {
   const provider = import.meta.env.VITE_AI_PROVIDER || "mock";

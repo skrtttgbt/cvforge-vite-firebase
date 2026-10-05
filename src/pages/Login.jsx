@@ -254,7 +254,7 @@ export default function Login() {
         <hr className="flex-1" />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 ">
         <Button
           variant="outline"
           type="button"
@@ -266,7 +266,7 @@ export default function Login() {
             : "Continue with Google"}
         </Button>
 
-        <Button
+        {/* <Button
           variant="outline"
           type="button"
           disabled={isBusy}
@@ -275,7 +275,7 @@ export default function Login() {
           {oauthLoading === "microsoft"
             ? "Signing in…"
             : "Continue with Microsoft"}
-        </Button>
+        </Button> */}
       </div>
 
       <Button

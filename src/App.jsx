@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import ProfileManagement from "./pages/ProfileManagement";
 import ProfileSources from "./pages/ProfileSources";
@@ -19,6 +20,7 @@ import CompleteProfile from "./pages/Completeprofile";
 import { onAuthChange } from "./services/authservice";
 import { getProfile } from "./services/firestoreService";
 import { isProfileComplete } from "./utils/profileValidation";
+import ResetPassword from "./pages/ResetPassword";
 
 export default function App() {
   return (
@@ -28,6 +30,8 @@ export default function App() {
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Employer / token routes should stay public */}
       <Route path="/access-token" element={<AccessToken />} />
