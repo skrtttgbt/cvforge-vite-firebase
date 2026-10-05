@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../layouts/AuthLayout";
 import FormField from "../components/FormField";
 import Button from "../components/Button";
+import TermsModal from "../components/TermsModal";
 
 import {
   loginWithEmail,
@@ -26,15 +27,14 @@ export default function Login() {
   const [oauthLoading, setOauthLoading] = useState(null);
   const [error, setError] = useState("");
 
+  // null = closed, "terms" | "privacy" = open on that document
+  const [legalModal, setLegalModal] = useState(null);
+
   const isBusy = loading || oauthLoading !== null;
 
   async function redirectAfterLogin(user) {
     try {
-
-
       const existingProfile = await getProfile(user.uid);
-
-
 
       if (isProfileComplete(existingProfile)) {
         navigate("/dashboard", {
@@ -289,21 +289,30 @@ export default function Login() {
 
       <p className="mt-6 text-center text-xs text-slate-500">
         By logging in, you agree to our{" "}
-        <Link
-          to="/terms"
-          className="text-forge"
+        <button
+          type="button"
+          onClick={() => setLegalModal("terms")}
+          className="text-forge underline-offset-2 hover:underline"
         >
           Terms of Service
-        </Link>{" "}
+        </button>{" "}
         and{" "}
-        <Link
-          to="/privacy"
-          className="text-forge"
+        <button
+          type="button"
+          onClick={() => setLegalModal("privacy")}
+          className="text-forge underline-offset-2 hover:underline"
         >
           Privacy Policy
-        </Link>
+        </button>
         .
       </p>
+
+      <TermsModal
+        open={legalModal !== null}
+        type={legalModal || "terms"}
+        onClose={() => setLegalModal(null)}
+        onSwitch={setLegalModal}
+      />
     </AuthLayout>
   );
 }
