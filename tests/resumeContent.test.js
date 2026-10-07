@@ -3,6 +3,37 @@ import assert from 'node:assert/strict';
 import { normalizeResume, reviewCandidates } from '../src/utils/resumeContent.js';
 import { portfolioAvailability, portfolioContactAvailability } from '../src/utils/portfolioSections.js';
 import { buildPortfolioSuggestions, applyPortfolioSuggestions } from '../src/utils/portfolioSuggestions.js';
+import { draftWithProfilePhoto } from '../src/utils/profilePhoto.js';
+import { requestPortfolioSuggestions } from '../src/utils/requestPortfolioSuggestions.js';
+
+test('portfolio recovers from Groq JSON validation errors with a valid second response', async () => {
+  let calls=0;
+  const result=await requestPortfolioSuggestions([],async()=>{
+    if(++calls===1) throw Object.assign(new Error('Failed to generate JSON. Please adjust your prompt.'),{code:'json_validate_failed'});
+    return {choices:[{message:{content:JSON.stringify({summary:'Create SQL reports.',projects:[],experience:[]})}}]};
+  });
+  assert.equal(calls,2);assert.equal(result.fallback,false);assert.equal(result.data.summary,'Create SQL reports.');
+});
+
+test('portfolio repeatedly invalid generated JSON uses labeled templates, while provider failures propagate', async () => {
+  for(const response of [null,{choices:[{message:{content:'{"summary":12,"projects":[],"experience":[]}'}}]}]) {
+    let calls=0;
+    const result=await requestPortfolioSuggestions([],async()=>{calls++;return response;});
+    assert.equal(calls,2);assert.equal(result.fallback,true);
+  }
+  await assert.rejects(requestPortfolioSuggestions([],async()=>{throw Object.assign(new Error('Invalid API key'),{status:401});}),/Invalid API key/);
+});
+
+test('existing drafts pick up the saved Cloudinary photo without changing approval decisions or mutating inputs', () => {
+  const url='https://res.cloudinary.com/drowvkwku/image/upload/v1791386432/jys4p0oudyig4cumjnbx.jpg';
+  const draft={status:'approved',resume:{imgUrl:'https://example.com/old.jpg',education:[]}};
+  const updated=draftWithProfilePhoto(draft,{imgUrl:url});
+  assert.equal(updated.resume.imgUrl,url);
+  assert.equal(updated.status,'approved');
+  assert.deepEqual(updated.resume.education,[]);
+  assert.equal(draft.resume.imgUrl,'https://example.com/old.jpg');
+  assert.equal(draftWithProfilePhoto(draft,{}),draft);
+});
 
 test('portfolio approvals apply only approved wording and preserve profile records', () => {
   const profile={summary:'I build SQL reports.',targetRole:'Data Analyst',skills:['SQL'],projects:[{projectTitle:'Reports',description:'I build SQL reports.'}],experience:[{companyName:'Team',jobTitle:'Analyst',description:'I test reports.'}],education:{college:[{schoolName:'College'}]}};

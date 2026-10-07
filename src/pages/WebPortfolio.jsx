@@ -185,7 +185,7 @@ export default function WebPortfolio() {
     setGenerating(true);
     setError('');
     try {
-      const baseline=structuredClone(profile);
+      const baseline={...structuredClone(profile),imgUrl:profilePhoto(profile,authState?.firebaseUser)};
       const result=await getPortfolioSuggestions(baseline);
       setImprovements({...result,profile:baseline,config:structuredClone(config),suggestions:result.suggestions.filter(item=>config.includeSections.includes(item.section))});
     } catch(error) { setError(error.message || 'Failed to prepare portfolio suggestions.'); }
@@ -419,7 +419,7 @@ export default function WebPortfolio() {
             <PortfolioPreview
               draft={portfolioDraft}
               config={config}
-              photoSrc={profilePhoto(authState?.profile || profile, authState?.user)}
+              photoSrc={profilePhoto(authState?.userProfile || profile, authState?.firebaseUser)}
               profile={profile}
               profileSources={profileSources}
               showContact={showContact}
@@ -495,7 +495,8 @@ export default function WebPortfolio() {
             <Button
               disabled={!portfolioDraft || portfolioDraft.status === "approved" || editing || generating || !!improvements}
               onClick={async () => {
-                const draft = { ...portfolioDraft, status: "approved" };
+                const currentPhoto=profilePhoto(authState?.userProfile || profile,authState?.firebaseUser);
+                const draft = { ...portfolioDraft, resume:{...portfolioDraft.resume,imgUrl:safeUrl(currentPhoto) || portfolioDraft.resume?.imgUrl || ''}, status: "approved" };
                 await saveWebPortfolioDraft(userId, { config, draft });
                 setPortfolioDraft(draft);
               }}

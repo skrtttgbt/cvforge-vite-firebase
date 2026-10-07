@@ -12,6 +12,11 @@ export async function requestGroq(request) {
     signal:AbortSignal.timeout(80000),
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(data?.error?.message || 'Groq AI request failed.');
+  if (!response.ok) {
+    const error=new Error(data?.error?.message || 'Groq AI request failed.');
+    error.code=data?.error?.code;
+    error.status=response.status;
+    throw error;
+  }
   return data;
 }

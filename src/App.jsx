@@ -11,6 +11,7 @@ import ProfileManagement from "./pages/ProfileManagement";
 import ProfileSources from "./pages/ProfileSources";
 import ResumeBuilder from "./pages/ResumeBuilder";
 import WebPortfolio from "./pages/WebPortfolio";
+import EmployerOutput from './pages/EmployerOutput';
 import PublicPortfolio from "./pages/PublicPortfolio";
 import InterviewPreparation from "./pages/InterviewPreparation";
 import TokenManagement from "./pages/TokenManagement";
@@ -40,6 +41,8 @@ export default function App() {
         <Route path="/access-token" element={<AccessToken />} />
         <Route path="/access-token/:tokenValue" element={<AccessToken />} />
         <Route path="/shared-profile/:tokenValue" element={<SharedProfile />} />
+        <Route path="/employer-dashboard/:tokenValue" element={<SharedProfile />} />
+        <Route path="/employer-view/:tokenValue/:outputType" element={<EmployerOutput />} />
         <Route path="/portfolio/:slug" element={<PublicPortfolio />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/p/:slug" element={<PublicPortfolio />} />
@@ -183,7 +186,7 @@ function RouteAccessibility() {
     };
     document.title =
       (titles[pathname] ||
-        (/^\/(p|portfolio|shared-profile|access-token)(\/|$)/.test(pathname)
+        (/^\/employer-view(\/|$)/.test(pathname) ? 'Shared Candidate Output' : /^\/(employer-dashboard|shared-profile)(\/|$)/.test(pathname) ? 'Employer / HR Dashboard' : /^\/access-token(\/|$)/.test(pathname) ? 'Employer Token Access' : /^\/(p|portfolio)(\/|$)/.test(pathname)
           ? "Shared Portfolio"
           : "Page not found")) + " | CVForge";
     const main = document.querySelector("main");

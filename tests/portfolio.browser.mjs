@@ -8,6 +8,7 @@ let identity=await auth('signUp');if(identity.error?.message==='EMAIL_EXISTS')id
 const env=await initializeTestEnvironment({projectId:'demo-cvforge',firestore:{host:'127.0.0.1',port:8089}});
 const profile={uid:identity.localId,userId:identity.localId,fullName:'Portfolio QA',targetRole:'Data Analyst',summary:'I build SQL reports.',skills:[{skillName:'SQL',category:'Database',proficiencyLevel:'Beginner'}],projects:[{projectTitle:'Reports',description:'I build SQL reports.'}],experience:[],education:{college:[{schoolName:'Test College',degreeProgram:'ICT'}]},certifications:[]};
 Object.assign(profile,{email,phone:'+639123456789',location:'Manila'});
+profile.imgUrl='https://res.cloudinary.com/drowvkwku/image/upload/v1791386432/jys4p0oudyig4cumjnbx.jpg';
 Object.assign(profile.projects[0],{role:'Developer',startDate:'2025-01',endDate:'2025-06'});
 profile.education.college[0].yearGraduated='2025';
 await env.withSecurityRulesDisabled(context=>setDoc(doc(context.firestore(),'profiles',identity.localId),profile));
@@ -40,6 +41,7 @@ try {
   await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Make Public'&&!b.disabled));
   await page.reload();
   await page.locator('[data-theme="minimal-white"]').waitFor();
+  await page.waitForFunction(()=>{const img=document.querySelector('[data-theme] img');return img?.naturalWidth>0 && img.src.includes('res.cloudinary.com/drowvkwku');});
   await page.getByRole('button',{name:'Make Public',exact:true}).click();
   await page.locator('.swal2-confirm').click();
   await page.getByText('Portfolio Published',{exact:true}).waitFor();

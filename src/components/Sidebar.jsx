@@ -9,6 +9,8 @@ import {
   ShieldCheck,
   LogOut,
   Users,
+  Award,
+  GraduationCap,
 } from "lucide-react";
 import Logo from "./Logo";
 import { logoutUser } from "../services/authservice";
@@ -23,31 +25,16 @@ const seekerLinks = [
   ["Token Management", "/token-management", ShieldCheck],
 ];
 
-export default function Sidebar({ employer = false }) {
+export default function Sidebar({ employer = false, onEmployerDashboard, employerSections = {}, onEmployerSection, employerSection = 'dashboard' }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userId, ownerId } = useParams();
-
-  const candidateId = userId || ownerId;
-
-  const currentSharedProfilePath = candidateId
-    ? `/shared-profile/${candidateId}`
-    : "";
-
-  if (currentSharedProfilePath) {
-    localStorage.setItem("lastCandidateViewPath", currentSharedProfilePath);
-  }
-
-  const lastCandidateViewPath =
-    localStorage.getItem("lastCandidateViewPath") || "";
+  const { tokenValue } = useParams();
 
   const employerLinks = [
-    ["Dashboard", "/employer", Home],
-    [
-      "Candidate View",
-      currentSharedProfilePath || lastCandidateViewPath,
-      Users,
-    ],
+    ["Dashboard", tokenValue ? location.pathname : "/access-token", Home],
+    ["Projects", location.pathname, Monitor, 'projects'],
+    ["Certificates", location.pathname, Award, 'certifications'],
+    ["Educational Background", location.pathname, GraduationCap, 'education'],
   ];
 
   const links = employer ? employerLinks : seekerLinks;
@@ -63,7 +50,7 @@ export default function Sidebar({ employer = false }) {
   };
 
   const handleBackToLogin = () => {
-    navigate("/login", { replace: true });
+    navigate("/access-token", { replace: true });
   };
 
   return (
@@ -75,7 +62,8 @@ export default function Sidebar({ employer = false }) {
       </div>
 
       <nav className="flex-1 space-y-1 px-4">
-        {links.map(([label, to, Icon]) => {
+        {links.map(([label, to, Icon, section]) => {
+          if (employer) return <button key={label} type="button" disabled={section && !employerSections[section]} onClick={()=>section ? onEmployerSection?.(section) : onEmployerDashboard?.()} className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40 ${employerSection===(section || 'dashboard')?'bg-forge text-white':'text-blue-100 hover:bg-white/10'}`}><Icon size={18}/>{label}</button>;
           const isDisabled = employer && label === "Candidate View" && !to;
 
           if (isDisabled) {
@@ -97,6 +85,7 @@ export default function Sidebar({ employer = false }) {
             <NavLink
               key={`${label}-${to}`}
               to={to}
+              onClick={employer && label === 'Dashboard' ? onEmployerDashboard : undefined}
               end={to === "/employer" || to === "/dashboard"}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition ${
@@ -121,7 +110,7 @@ export default function Sidebar({ employer = false }) {
             className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm text-blue-100 transition hover:bg-white/10"
           >
             <LogOut size={18} />
-            Back to Login
+            Use Another Token
           </button>
         ) : (
           <button

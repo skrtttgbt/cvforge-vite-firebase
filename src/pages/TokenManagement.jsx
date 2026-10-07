@@ -9,6 +9,8 @@ import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
   getProfile,
+  getResumeDraft,
+  getWebPortfolioDraft,
   createToken,
   getTokensByOwner,
   revokeToken,
@@ -44,6 +46,7 @@ export default function TokenManagement() {
   const [tokens, setTokens] = useState([]);
   const [form, setForm] = useState(defaultForm);
   const [generatedToken, setGeneratedToken] = useState(null);
+  const [outputStatus, setOutputStatus] = useState({resume:'Not generated',portfolio:'Not generated'});
 
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -63,6 +66,8 @@ export default function TokenManagement() {
       try {
         const savedProfile = await getProfile(user.uid);
         const savedTokens = await getTokensByOwner(user.uid);
+        const [resume,portfolio] = await Promise.all([getResumeDraft(user.uid),getWebPortfolioDraft(user.uid)]);
+        setOutputStatus({resume:resume?.draft?.status || 'Not generated',portfolio:portfolio?.draft?.status || 'Not generated'});
 
         setProfile(savedProfile || null);
         setTokens(savedTokens || []);
@@ -409,6 +414,11 @@ Thank you.`
               <option value="10 Views">10 Views</option>
               <option value="25 Views">25 Views</option>
             </FormField>
+          </div>
+          <div className="mt-4 space-y-2 rounded-lg bg-slate-50 p-3 text-sm">
+            {/resume/i.test(form.accessType) && <p>Resume: <b>{outputStatus.resume}</b>. {outputStatus.resume !== 'approved' && <a className="text-forge underline" href="/resume-builder">Generate or edit your resume and complete the final review.</a>}</p>}
+            {/portfolio/i.test(form.accessType) && <p>Portfolio: <b>{outputStatus.portfolio}</b>. {outputStatus.portfolio !== 'approved' && <a className="text-forge underline" href="/web-portfolio">Review your portfolio, then choose Approve for Publishing.</a>}</p>}
+            <p>Full Access requires both outputs to be approved. Profile edits return existing outputs to Draft.</p>
           </div>
 
           <label className="mt-4 flex gap-2 text-sm">

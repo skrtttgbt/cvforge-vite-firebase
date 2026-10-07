@@ -37,7 +37,7 @@ export default function AccessToken() {
           return;
         }
 
-        navigate('/shared-profile/' + cleanToken, { replace: true, state: { sharedToken: token } });
+        navigate('/employer-dashboard/' + cleanToken, { replace: true, state: { sharedToken: token } });
       } catch (err) {
         console.error("Token access error:", err);
         setError("Failed to verify token. Try again.");
@@ -64,7 +64,7 @@ export default function AccessToken() {
     <div className="min-h-screen bg-slate-50">
       <header className="flex items-center justify-between bg-navy px-6 py-5 text-white">
         <Logo dark />
-        <span className="text-sm font-bold">For ICT Job Seekers</span>
+        <span className="text-sm font-bold">For Employers / HR</span>
       </header>
 
       <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-10">

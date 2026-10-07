@@ -345,6 +345,12 @@ export default function ResumeBuilder() {
             {draft?.warning && <p role="alert">{draft.warning}</p>}
             <span>{draft?.status === "approved" ? "Approved" : "Draft"}</span>
             <Button
+              disabled={!draft || draft.status === "approved" || editing || generating || reviewing || !!improvements}
+              onClick={() => setReviewing(true)}
+            >
+              Approve
+            </Button>
+            <Button
               variant="outline"
               disabled={!draft || generating || editing}
               onClick={() => {

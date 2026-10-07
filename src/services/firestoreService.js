@@ -1,4 +1,5 @@
 import { filteredDraft, sharedLinks, validateTokenState, isSecureId } from "../utils/sharing";
+import { draftWithProfilePhoto } from '../utils/profilePhoto';
 import {
   doc,
   setDoc,
@@ -45,7 +46,7 @@ export async function saveProfile(userId, profileData) {
           draft: {
             ...data.draft,
             status: "draft",
-            resume: { ...data.draft.resume, targetRole },
+            resume: { ...data.draft.resume, targetRole, ...(Object.hasOwn(profileData,'imgUrl') ? {imgUrl:profileData.imgUrl || ''} : {}) },
           },
           config: { ...data.config, targetRole },
           updatedAt: serverTimestamp(),
@@ -106,11 +107,13 @@ export async function getProfileSources(userId) {
 }
 
 export async function saveResumeDraft(userId, data) {
+  const currentProfile = await getProfile(userId);
   data = {
     ...data,
+    draft: draftWithProfilePhoto(data.draft,currentProfile),
     config: {
       ...data.config,
-      targetRole: (await getProfile(userId))?.targetRole || "",
+      targetRole: currentProfile?.targetRole || "",
     },
   };
   if (!isConfigured) return { offline: true, data };
@@ -136,6 +139,7 @@ export async function getResumeDraft(userId) {
 }
 export async function saveWebPortfolioDraft(userId, data) {
   const sources = await getProfileSources(userId);
+  data = { ...data, draft: draftWithProfilePhoto(data.draft,await getProfile(userId)) };
   data = { ...data, approvedSharedSources: data.draft?.status === 'approved' ? sharedLinks(sources?.sources, data.config) : [] };
   data = {
     ...data,
@@ -217,7 +221,10 @@ export async function createToken(ownerId, tokenData) {
     const hasResume=/resume/i.test(accessType),hasPortfolio=/portfolio/i.test(accessType);
     const resume=hasResume ? (await transaction.get(doc(db,'resumeDrafts',ownerId))).data() : null;
     const portfolio=hasPortfolio ? (await transaction.get(doc(db,'webPortfolioDrafts',ownerId))).data() : null;
-    if ((hasResume && resume?.draft?.status !== 'approved') || (hasPortfolio && portfolio?.draft?.status !== 'approved')) throw new Error('Approve every selected output before creating a token.');
+    const unapproved=[];
+    if (hasResume && resume?.draft?.status !== 'approved') unapproved.push('resume in Resume Builder');
+    if (hasPortfolio && portfolio?.draft?.status !== 'approved') unapproved.push('portfolio in Web Portfolio');
+    if (unapproved.length) throw new Error('Approve your '+unapproved.join(' and ')+' before creating this token. You can also choose an access type containing only an approved output.');
     const record={ schemaVersion:2,token:id,tokenValue:id,ownerId,sharedResourceId:id,active:true,status:'Active',expiresAt:Timestamp.fromDate(expiresAt),createdAt:serverTimestamp(),updatedAt:serverTimestamp(),viewCount:0,maxViews,allowDownload:tokenData.allowDownload === true,accessType,hasResume,hasPortfolio,resumeUpdatedAt:resume?.updatedAt || null,portfolioUpdatedAt:portfolio?.updatedAt || null };
     const share={ schemaVersion:2,ownerId,token:id,sharedResume:resume ? filteredDraft(resume.draft) : null,sharedPortfolio:portfolio ? filteredDraft(portfolio.draft,portfolio.config) : null,sharedSources:portfolio?.approvedSharedSources || [] };
     transaction.set(doc(db,'tokens',id),record);

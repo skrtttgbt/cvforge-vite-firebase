@@ -208,7 +208,6 @@ try {
     ),
   );
   // Review one question at a time, skip SQL and retain education; decisions survive reload.
-  await page.getByRole('button',{name:'Approve',exact:true}).click();
   await page.getByRole('dialog',{name:'Review Resume'}).waitFor();
   await page.keyboard.press('Escape');
   assert.equal(await page.getByRole('dialog').count(),0);
@@ -289,8 +288,21 @@ try {
   const guest = await guestContext.newPage();
   guest.on('pageerror', error => errors.push(error.message));
   await guest.goto('http://127.0.0.1:5173/access-token/'+sharing.token);
-  await guest.getByRole('heading',{name:'Shared Portfolio',exact:true}).waitFor();
-  assert.equal(await guest.getByRole('button',{name:'Print / Download shared content'}).count(),0);
+  await guest.getByRole('heading',{name:'Employer / HR Dashboard',exact:true}).waitFor();
+  assert.equal(await guest.getByRole('button',{name:'Download Resume',exact:true}).count(),0);
+  const [portfolioTab]=await Promise.all([guest.waitForEvent('popup'),guest.getByRole('button',{name:'View Portfolio',exact:true}).click()]);
+  await portfolioTab.getByRole('heading',{name:'Shared Portfolio',exact:true}).waitFor();
+  await portfolioTab.getByText('QA Applicant',{exact:true}).first().waitFor();
+  await portfolioTab.close();
+  const [resumeTab]=await Promise.all([guest.waitForEvent('popup'),guest.getByRole('button',{name:'View Resume',exact:true}).click()]);
+  await resumeTab.getByRole('heading',{name:'Shared Resume',exact:true}).waitFor();
+  await resumeTab.getByText('QA Applicant',{exact:true}).first().waitFor();
+  await resumeTab.close();
+  await guest.getByRole('button',{name:'Educational Background',exact:true}).click();
+  await guest.getByRole('heading',{name:'Educational Background',exact:true}).waitFor();
+  await guest.getByRole('button',{name:'Dashboard',exact:true}).click();
+  assert.equal(await guest.getByRole('button',{name:'Back to Login',exact:true}).count(),0);
+  assert.equal(await guest.getByRole('link',{name:'Use another token',exact:true}).count(),0);
   assert.ok(!(await guest.textContent('main')).includes('qa@example.com'));
   await guest.goto('http://127.0.0.1:5173/access-token/'+sharing.token);
   await guest.getByText('Invalid or non-existent token.',{exact:true}).waitFor();
@@ -300,11 +312,17 @@ try {
   await guest.getByText('QA Applicant',{exact:true}).first().waitFor();
   assert.ok(!(await guest.textContent('main')).includes('qa@example.com'));
   await guest.goto('http://127.0.0.1:5173/shared-profile/'+sharing.direct);
-  await guest.getByRole('button',{name:'Print / Download shared content'}).waitFor();
+  await guest.getByRole('button',{name:'Download Resume',exact:true}).waitFor();
+  assert.equal(await guest.getByRole('button',{name:'View Portfolio',exact:true}).count(),0);
   await guest.reload();
   await guest.getByRole('alert').waitFor();
   await guest.goto('http://127.0.0.1:5173/access-token/'+sharing.portfolioOnly);
-  await guest.getByRole('heading',{name:'Shared Portfolio',exact:true}).waitFor();
+  await guest.getByRole('heading',{name:'Employer / HR Dashboard',exact:true}).waitFor();
+  assert.equal(await guest.getByRole('button',{name:'View Resume',exact:true}).count(),0);
+  assert.equal(await guest.getByRole('button',{name:'Download Resume',exact:true}).count(),0);
+  const [onlyPortfolioTab]=await Promise.all([guest.waitForEvent('popup'),guest.getByRole('button',{name:'View Portfolio',exact:true}).click()]);
+  await onlyPortfolioTab.getByText('QA Applicant',{exact:true}).first().waitFor();
+  await onlyPortfolioTab.close();
   await guestContext.close();
   await page.evaluate(async () => {
     const { auth } = await import("/src/services/firebase.js");
