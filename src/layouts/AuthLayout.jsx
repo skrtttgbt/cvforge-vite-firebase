@@ -26,24 +26,57 @@ export default function AuthLayout({ type, children }) {
           </Link>
         </div>
       </header>
-      <main className="grid min-h-[calc(100vh-72px)] grid-cols-1 gap-8 px-6 py-10 lg:grid-cols-2 lg:px-16">
-        <section className="flex flex-col justify-center">
-          <Logo  dark />
-          <h1 className="mt-8 text-4xl font-extrabold leading-tight text-ink md:text-5xl">
-            {headline}
-            <br />
-            <span className="text-forge">{accent}</span>
+      <main className="mx-auto grid min-h-[calc(100vh-81px)] max-w-7xl grid-cols-1 gap-14 px-5 py-10 lg:grid-cols-2 lg:gap-20 lg:px-8 lg:py-14">
+        {/* Left */}
+        <section className="flex flex-col justify-center lg:sticky lg:top-10 lg:h-fit">
+          
+          <div className="origin-left scale-150">
+            <Logo />
+          </div>
+
+          <h1 className="mt-10 max-w-xl text-4xl font-extrabold leading-tight text-ink md:text-5xl xl:text-6xl">
+            {isLogin ? "Build Your Future." : "Create. Showcase. Get Hired."}
+            <span className="mt-2 block text-forge">
+              {isLogin ? "We've Got the Tools." : "With CVForge."}
+            </span>
           </h1>
-          <p className="mt-5 max-w-xl text-lg text-slate-600">Create professional resumes, stunning portfolios, and prepare for interviews with AI-powered tools.</p>
-          <div className="mt-8 grid max-w-lg gap-5">
-            <Feature icon={FileText} title="AI-Assisted Resume Builder" text="Create a professional resume that stands out." />
-            <Feature icon={Globe} title="Web Portfolio Generator" text="Showcase your projects with a beautiful portfolio." />
-            <Feature icon={Sparkles} title="Interview Preparation" text="Practice smarter with AI generated questions." />
-            <Feature icon={ShieldCheck} title="Secure & Private" text="Share outputs using token-based access." />
+
+          <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 md:text-lg">
+            Create professional resumes, build beautiful online portfolios,
+            prepare for interviews, and share your professional profile securely
+            with AI-powered tools.
+          </p>
+
+          <div className="mt-12 grid gap-5 sm:grid-cols-2">
+            <Feature
+              icon={FileText}
+              title="AI Resume Builder"
+              text="Create ATS-friendly resumes in minutes."
+            />
+
+            <Feature
+              icon={Globe}
+              title="Portfolio Generator"
+              text="Launch your own professional portfolio website."
+            />
+
+            <Feature
+              icon={Sparkles}
+              title="Interview Practice"
+              text="Generate AI-powered interview questions."
+            />
+
+            <Feature
+              icon={ShieldCheck}
+              title="Private Sharing"
+              text="Securely share resumes with token-based access."
+            />
           </div>
         </section>
+
+        {/* Right */}
         <section className="flex items-center justify-center">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-6 shadow-soft md:p-10">
+          <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8 md:p-10">
             {children}
           </div>
         </section>

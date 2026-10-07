@@ -11,7 +11,7 @@ import {
   loginWithGoogle,
   loginWithMicrosoft,
 } from "../services/authservice";
-
+import { Eye, EyeOff } from "lucide-react"
 import { getProfile } from "../services/firestoreService";
 
 import { isProfileComplete } from "../utils/profileValidation";
@@ -26,6 +26,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(null);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // null = closed, "terms" | "privacy" = open on that document
   const [legalModal, setLegalModal] = useState(null);
@@ -196,7 +197,7 @@ export default function Login() {
 
         <FormField
           label="Password"
-          type="password"
+          type={showPassword ? "text" : "password"}
           placeholder="Enter your password"
           value={password}
           onChange={(event) =>
@@ -205,6 +206,15 @@ export default function Login() {
           disabled={isBusy}
           autoComplete="current-password"
           required
+          rightIcon={
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="text-slate-500 hover:text-slate-700"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          }
         />
 
         <div className="flex items-center justify-between text-sm">
@@ -221,10 +231,7 @@ export default function Login() {
             <span>Remember me</span>
           </label>
 
-          <Link
-            to="/forgot-password"
-            className="font-bold text-forge"
-          >
+          <Link to="/forgot-password" className="font-bold text-forge" onClick={() => navigate("/forgot-password")}>
             Forgot Password?
           </Link>
         </div>

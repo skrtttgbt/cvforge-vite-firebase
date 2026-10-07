@@ -9,7 +9,7 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
   verifyPasswordResetCode,
-  confirmPasswordReset 
+  confirmPasswordReset,
 } from "firebase/auth";
 
 import {
@@ -105,5 +105,9 @@ export async function logoutUser() {
 }
 
 export function onAuthChange(callback) {
-  return onAuthStateChanged(auth, callback);
+  return onAuthStateChanged(auth, callback)
+}
+
+export async function sendResetPasswordEmail(email) {
+  await sendPasswordResetEmail(auth, email);
 }

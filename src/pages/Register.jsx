@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../layouts/AuthLayout'
 import FormField from '../components/FormField'
 import Button from '../components/Button'
+import { Eye, EyeOff } from "lucide-react"
 import { registerWithEmail, loginWithGoogle, loginWithMicrosoft } from '../services/authservice'
 import { saveProfile, getProfile } from '../services/firestoreService.js'
 
@@ -15,6 +16,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(null) // 'google' | 'microsoft'
   const [errors, setErrors] = useState({})
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   function set(field) {
     return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))
@@ -94,21 +97,39 @@ export default function Register() {
         />
         <FormField
           label="Password"
-          type="password"
+          type={showPassword ? "text" : "password"}
           placeholder="Create a password (min. 8 characters)"
           value={form.password}
           onChange={set('password')}
           error={errors.password}
           required
+          rightIcon={
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="text-slate-500 hover:text-slate-700"
+            >
+              {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          }
         />
         <FormField
           label="Confirm Password"
-          type="password"
+          type={showConfirmPassword ? "text" : "password"}
           placeholder="Confirm your password"
           value={form.confirm}
           onChange={set('confirm')}
           error={errors.confirm}
           required
+          rightIcon={
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              className="text-slate-500 hover:text-slate-700"
+            >
+              {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+            </button>
+          }
         />
 
         <div>

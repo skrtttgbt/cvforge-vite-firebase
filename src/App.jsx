@@ -15,8 +15,8 @@ import TokenManagement from "./pages/TokenManagement";
 import AccessToken from "./pages/AccessToken";
 import SharedProfile from "./pages/SharedProfile";
 import EmployerDashboard from "./pages/EmployerDashboard";
-import CompleteProfile from "./pages/Completeprofile";
-
+import CompleteProfile from "./pages/CompleteProfile";
+import ForgetPassword from "./pages/ForgetPassword";
 import { onAuthChange } from "./services/authservice";
 import { getProfile } from "./services/firestoreService";
 import { isProfileComplete } from "./utils/profileValidation";
@@ -30,8 +30,7 @@ export default function App() {
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/forgot-password" element={<ForgetPassword />} />
 
       {/* Employer / token routes should stay public */}
       <Route path="/access-token" element={<AccessToken />} />
