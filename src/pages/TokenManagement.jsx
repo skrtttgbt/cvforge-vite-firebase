@@ -403,8 +403,8 @@ Thank you.`
               value={form.accessLimit}
               onChange={handleChange}
             >
-              <option value="Unlimited Views">Unlimited Views</option>
               <option value="One Time">One Time View</option>
+              <option value="Unlimited Views">Unlimited Views</option>
               <option value="5 Views">5 Views</option>
               <option value="10 Views">10 Views</option>
               <option value="25 Views">25 Views</option>
@@ -636,7 +636,6 @@ function getExpirationDate(expiration) {
 }
 
 function getMaxViews(accessLimit) {
-  if (accessLimit === "One Time") return 1;
   if (accessLimit === "Unlimited Views") return null;
 
   const number = Number(accessLimit.split(" ")[0]);
