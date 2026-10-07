@@ -26,7 +26,7 @@ export default function AuthLayout({ type, children }) {
           </Link>
         </div>
       </header>
-      <main className="mx-auto grid min-h-[calc(100vh-81px)] max-w-7xl grid-cols-1 gap-14 px-5 py-10 lg:grid-cols-2 lg:gap-20 lg:px-8 lg:py-14">
+      <main id="main-content" tabIndex={-1} className="mx-auto grid min-h-[calc(100vh-81px)] max-w-7xl grid-cols-1 gap-14 px-5 py-10 lg:grid-cols-2 lg:gap-20 lg:px-8 lg:py-14">
         {/* Left */}
         <section className="flex flex-col justify-center lg:sticky lg:top-10 lg:h-fit">
           

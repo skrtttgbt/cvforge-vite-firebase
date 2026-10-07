@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/grounding.test.js tests/sharing.test.js tests/withTimeout.test.js tests/resumeContent.test.js tests/resumeSuggestions.test.js src/utils/profileValidation.test.js",
+    "test:security": "npx -y firebase-tools@latest emulators:exec --only firestore --project demo-cvforge \"node tests/security.mjs\""
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -22,5 +24,9 @@
     "react-router-dom": "latest",
     "sweetalert2": "^11.26.25",
     "vite": "latest"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "playwright": "^1.63.0"
   }
 }

@@ -6,7 +6,7 @@ export default function AppLayout({ title, subtitle, badge, children, employer =
   return (
     <div className="min-h-screen bg-slate-50">
       <Sidebar employer={employer} />
-      <main className="lg:pl-60">
+      <main id="main-content" tabIndex={-1} className="min-w-0 lg:pl-60">
         <TopBar
           title={title}
           subtitle={subtitle}

@@ -1,3 +1,4 @@
+import { safeUrl } from '../utils/grounding';
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
@@ -170,37 +171,13 @@ export default function ProfileSources() {
     });
   };
 
-  const handleImportSource = async (index) => {
-    try {
-      setProcessingSource(index);
-
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      setSources((prev) => {
-        const updated = [...prev];
-
-        updated[index] = {
-          ...updated[index],
-          status: "Imported",
-        };
-
-        return updated;
-      });
-
-      Swal.fire({
-        icon: "success",
-        title: "Imported",
-        text: "Profile data imported successfully.",
-        timer: 1500,
-        showConfirmButton: false,
-      });
-    } finally {
-      setProcessingSource(null);
-    }
+  const handleImportSource = async () => {
+    await Swal.fire({ icon: 'info', title: 'Import unavailable', text: 'CVForge currently saves source links only. Add and review facts manually in Profile Management; no source content has been imported.' });
   };
 
   const handleSourceAction = async (index) => {
     const source = sources[index];
+    if (!safeUrl(source.url)) { Swal.fire({ icon: "error", title: "Invalid URL", text: "Use a full http:// or https:// URL." }); return; }
 
     // If pending → connect first
     if (source.status === "Pending") {
@@ -208,7 +185,6 @@ export default function ProfileSources() {
 
       try {
         // simulate validation / API check
-        await new Promise((r) => setTimeout(r, 1000));
 
         setSources((prev) => {
           const updated = [...prev];
@@ -218,8 +194,8 @@ export default function ProfileSources() {
 
         Swal.fire({
           icon: "success",
-          title: "Link Verified",
-          text: `${source.name} is now connected.`,
+          title: "Link saved",
+          text: `${source.name} link saved. Its contents have not been fetched or verified.`,
           timer: 1500,
           showConfirmButton: false,
         });
@@ -344,7 +320,7 @@ export default function ProfileSources() {
             {profileLinks.map((source) => (
               <a
                 key={source.name}
-                href={formatUrl(source.url)}
+                href={safeUrl(source.url) || undefined}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-slate-200 px-4 py-2 text-sm font-bold text-forge hover:bg-blue-50"

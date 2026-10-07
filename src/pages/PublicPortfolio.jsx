@@ -38,7 +38,7 @@ export default function PublicPortfolio() {
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-50 p-6">
+      <main id="main-content" tabIndex={-1} className="grid min-h-screen place-items-center bg-slate-50 p-6">
         <p className="text-sm font-semibold text-slate-500">Loading portfolio...</p>
       </main>
     );
@@ -46,7 +46,7 @@ export default function PublicPortfolio() {
 
   if (error || !portfolio) {
     return (
-      <main className="grid min-h-screen place-items-center bg-slate-50 p-6">
+      <main id="main-content" tabIndex={-1} className="grid min-h-screen place-items-center bg-slate-50 p-6">
         <div className="max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center shadow-soft">
           <h1 className="text-xl font-extrabold text-ink">Portfolio Not Found</h1>
           <p className="mt-2 text-sm text-slate-600">
@@ -58,7 +58,7 @@ export default function PublicPortfolio() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-4 md:p-8">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-slate-100 p-4 md:p-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-4 flex justify-end">
           <Button variant="outline" onClick={() => window.print()}>
@@ -68,13 +68,14 @@ export default function PublicPortfolio() {
 
         <PortfolioPreview
           draft={portfolio.draft}
+          config={{themeStyle:portfolio.themeStyle || 'Modern Blue',showEmail:true,showPhone:true,showAddress:true,showLinks:true}}
           profile={portfolio.publicProfile}
           profileSources={portfolio.publicSources || []}
           showContact
           onToggleContact={() => {}}
-          onDownloadResume={() => window.print()}
+          onDownloadResume={() => {}}
           downloading={false}
-          hasResume
+          hasResume={false}
         />
       </div>
     </main>

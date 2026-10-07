@@ -1,5 +1,14 @@
+import DraftEditor from "../components/DraftEditor";
+import ResumeApproval from '../components/ResumeApproval';
+import ResumeImprovements from '../components/ResumeImprovements';
+import { getResumeSuggestions } from '../services/resumeSuggestionsService';
+import { saveResumeProfileSuggestions } from '../services/resumeProfileSuggestions';
+import { resumeSuggestionProfile, includeApprovedSuggestions } from '../utils/resumeSuggestions';
+import { normalizeResume } from '../utils/resumeContent';
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import { useEffect, useRef, useState } from "react";
-import html2pdf from "html2pdf.js";
+import { useNavigate } from 'react-router-dom';
+
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
 import Button from "../components/Button";
@@ -15,13 +24,19 @@ import {
 import { WandSparkles, Save, Download } from "lucide-react";
 
 const defaultConfig = {
-  targetRole: "Full Stack Developer",
+  targetRole: "",
   experienceLevel: "Mid-Level (2–5 years)",
   tone: "Professional",
 };
 
 export default function ResumeBuilder() {
+  const navigate = useNavigate();
   const resumeRef = useRef(null);
+  const [editing, setEditing] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [improvements, setImprovements] = useState(null);
+  const workflowBusy = useRef(false);
+  const draftRevision = useRef(0);
   const [userId, setUserId] = useState(null);
   const [profile, setProfile] = useState(null);
 
@@ -36,6 +51,7 @@ export default function ResumeBuilder() {
 
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
+      const revision = draftRevision.current;
       if (!user) {
         setLoading(false);
         return;
@@ -56,9 +72,14 @@ export default function ResumeBuilder() {
           }));
         }
 
-        if (savedDraft) {
-          setConfig(savedDraft.config || defaultConfig);
-          setDraft(savedDraft.draft || null);
+        if (savedDraft && !workflowBusy.current && revision===draftRevision.current) {
+          setConfig({
+            ...defaultConfig,
+            ...savedDraft.config,
+            targetRole: savedProfile?.targetRole || "",
+          });
+          const stored = savedDraft.draft;
+          setDraft(stored ? { ...stored, resume: normalizeResume(stored.resume, savedProfile || {}) } : null);
         }
       } catch (error) {
         console.error("Error loading resume builder data:", error);
@@ -73,6 +94,7 @@ export default function ResumeBuilder() {
 
   const handleConfigChange = (e) => {
     const { name, value } = e.target;
+    if (name === "targetRole") return;
 
     setConfig((prev) => ({
       ...prev,
@@ -81,43 +103,33 @@ export default function ResumeBuilder() {
   };
 
   const generate = async () => {
+    if(!profile?.targetRole) { setError('Set your target role in Profile first.'); return; }
     setGenerating(true);
+    workflowBusy.current=true;
+    draftRevision.current++;
     setError("");
-
     try {
-      const result = await generateAIContent("Resume Draft", {
-        targetRole: config.targetRole,
-        experienceLevel: config.experienceLevel,
-        tone: config.tone,
-        profile: {
-          fullName: profile?.fullName,
-          targetRole: profile?.targetRole,
-          email: profile?.email,
-          phone: profile?.phone,
-          location: profile?.location,
-          summary: profile?.summary,
-          education: profile?.education,
-          experience: profile?.experience,
-          skills: profile?.skills,
-          projects: profile?.projects,
-          certifications: profile?.certifications,
-        },
-      });
-
-      setDraft(result);
-
-      if (userId) {
-        await saveResumeDraft(userId, {
-          config,
-          draft: result,
-        });
-      }
-    } catch (error) {
-      console.error(error);
-      setError(error.message || "Failed to generate resume draft.");
-    } finally {
-      setGenerating(false);
-    }
+      const baseline=structuredClone(profile);
+      const result=await getResumeSuggestions(baseline);
+      setImprovements({...result,profile:baseline,config:{...config}});
+    } catch(error) {
+      workflowBusy.current=false;
+      setError(error.message || 'Failed to prepare resume improvement questions.');
+    } finally { setGenerating(false); }
+  };
+  const generateReviewedDraft = async suggestions => {
+    const latestProfile=await getProfile(userId);
+    if(latestProfile?.targetRole!==improvements.profile.targetRole) throw new Error('Your target role changed. Restart the improvement questions.');
+    const approvedProfile=resumeSuggestionProfile(improvements.profile,suggestions);
+    const generated=await generateAIContent('Resume Draft',{...improvements.config,profile:approvedProfile});
+    const result={...generated,status:'draft',resume:includeApprovedSuggestions(generated.resume,approvedProfile,suggestions)};
+    await saveResumeDraft(userId,{config:improvements.config,draft:result});
+    draftRevision.current++;
+    setEditing(false);
+    setReviewing(true);
+    setDraft(result);
+    setImprovements(null);
+    workflowBusy.current=false;
   };
 
   const handleSaveDraft = async () => {
@@ -212,6 +224,7 @@ export default function ResumeBuilder() {
     };
 
     try {
+      const { default: html2pdf } = await import("html2pdf.js");
       await html2pdf().set(options).from(resumeRef.current).save();
     } catch (error) {
       console.error("PDF download error:", error);
@@ -224,7 +237,7 @@ export default function ResumeBuilder() {
   if (loading) {
     return (
       <AppLayout title="AI-Assisted Resume Builder">
-        <p>Loading...</p>
+        <LoadingSkeleton />
       </AppLayout>
     );
   }
@@ -242,9 +255,13 @@ export default function ResumeBuilder() {
               label="Target ICT Role"
               as="select"
               name="targetRole"
-              value={config.targetRole}
+              value={profile?.targetRole || ""}
+              disabled
               onChange={handleConfigChange}
             >
+              <option value={profile?.targetRole || ""}>
+                {profile?.targetRole || "Set target role in Profile"}
+              </option>
               <option value="Full Stack Developer">Full Stack Developer</option>
               <option value="Frontend Developer">Frontend Developer</option>
               <option value="Backend Developer">Backend Developer</option>
@@ -255,27 +272,9 @@ export default function ResumeBuilder() {
                 Cybersecurity Specialist
               </option>
             </FormField>
-
-            <FormField
-              label="Experience Level"
-              as="select"
-              name="experienceLevel"
-              value={config.experienceLevel}
-              onChange={handleConfigChange}
-            >
-              <option value="Entry-Level / Fresh Graduate">
-                Entry-Level / Fresh Graduate
-              </option>
-              <option value="Junior Level (0–2 years)">
-                Junior Level (0–2 years)
-              </option>
-              <option value="Mid-Level (2–5 years)">
-                Mid-Level (2–5 years)
-              </option>
-              <option value="Senior Level (5+ years)">
-                Senior Level (5+ years)
-              </option>
-            </FormField>
+            <Button type="button" variant="outline" onClick={() => navigate('/profile')}>
+              Change Target Role
+            </Button>
 
             <FormField
               label="Resume Tone"
@@ -290,7 +289,6 @@ export default function ResumeBuilder() {
               <option value="Modern">Modern</option>
               <option value="Academic">Academic</option>
             </FormField>
-
           </div>
 
           {error && (
@@ -302,10 +300,10 @@ export default function ResumeBuilder() {
           <Button
             onClick={generate}
             className="mt-5 w-full"
-            disabled={generating}
+            disabled={generating || editing}
           >
             <WandSparkles size={16} />
-            {generating ? "Generating..." : "Generate Resume"}
+            {generating ? "Preparing questions..." : "Generate Resume"}
           </Button>
         </Card>
 
@@ -323,43 +321,86 @@ export default function ResumeBuilder() {
             )
           }
         >
-           <div className="relative min-h-[300px]">
-              {generating && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
-                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-300 border-t-forge"></div>
+          <div className="relative min-h-[300px]">
+            {generating && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-300 border-t-forge"></div>
 
-                  <p className="mt-3 text-sm font-medium text-slate-600">
-                    AI is generating your resume...
-                  </p>
+                <p className="mt-3 text-sm font-medium text-slate-600">
+                  Preparing resume improvement questions...
+                </p>
 
-                  <p className="text-xs text-slate-400">
-                    This may take a few seconds
-                  </p>
-                </div>
-              )}
-
-              <div ref={resumeRef}>
-                <ResumePreview profile={profile} draft={draft} />
+                <p className="text-xs text-slate-400">
+                  This may take a few seconds
+                </p>
               </div>
+            )}
+
+            <div ref={resumeRef}>
+              <ResumePreview profile={profile} draft={draft} />
             </div>
+          </div>
 
           <div className="mt-5 flex flex-wrap gap-3">
+            {draft?.warning && <p role="alert">{draft.warning}</p>}
+            <span>{draft?.status === "approved" ? "Approved" : "Draft"}</span>
+            <Button
+              variant="outline"
+              disabled={!draft || generating || editing}
+              onClick={() => {
+                setEditing(true);
+              }}
+            >
+              Edit
+            </Button>
+            {editing && (
+              <DraftEditor
+                resume={draft.resume}
+                onCancel={() => setEditing(false)}
+                onSave={async (resume) => {
+                  const updated = { ...draft, resume, status: "draft" };
+                  await saveResumeDraft(userId, { config, draft: updated });
+                  setDraft(updated);
+                  setEditing(false);
+                  setReviewing(true);
+                }}
+              />
+            )}
             <Button
               variant="outline"
               onClick={handleSaveDraft}
-              disabled={saving || !draft}
+              disabled={saving || !draft || editing}
             >
               <Save size={16} />
               {saving ? "Saving..." : "Save Draft"}
             </Button>
 
-            <Button onClick={handleDownloadResumePdf} disabled={!draft || downloading}>
+            <Button
+              onClick={handleDownloadResumePdf}
+              disabled={draft?.status !== "approved" || downloading || editing}
+            >
               <Download size={16} />
               {downloading ? "Downloading..." : "Download Resume"}
             </Button>
           </div>
         </Card>
       </div>
+      {reviewing && draft && <ResumeApproval resume={draft.resume} profile={profile || {}}
+        onCancel={() => setReviewing(false)}
+        onApprove={async resume => {
+          const approved = { ...draft, resume, status:'approved' };
+          await saveResumeDraft(userId,{config,draft:approved});
+          setDraft(approved);
+          setReviewing(false);
+        }} />}
+      {improvements && <ResumeImprovements suggestions={improvements.suggestions} notice={improvements.notice}
+        onCancel={()=>{setImprovements(null);workflowBusy.current=false;draftRevision.current++;}}
+        onSaveProfile={async suggestions=>{
+          const saved=await saveResumeProfileSuggestions(userId,suggestions,improvements.profile);
+          setProfile(saved);
+          setDraft(previous=>previous?{...previous,status:'draft'}:null);
+        }}
+        onGenerate={generateReviewedDraft} />}
     </AppLayout>
   );
 }
@@ -387,11 +428,13 @@ function formatResumeText(resume = {}) {
       "Technical Skills",
       groupTechnicalSkills(resume.technicalSkills).map((group) => {
         const skills = group.items
-          .map((item) => item.level ? `${item.name} (${item.level})` : item.name)
+          .map((item) =>
+            item.level ? `${item.name} (${item.level})` : item.name,
+          )
           .join(", ");
 
         return `${group.category}: ${skills}`;
-      })
+      }),
     );
   }
 
@@ -406,8 +449,10 @@ function formatResumeText(resume = {}) {
         formatDateRange(item.startDate, item.endDate),
         item.employmentType,
         item.description,
-      ].filter(Boolean).join("\n")
-    )
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ),
   );
 
   addSection(
@@ -417,12 +462,15 @@ function formatResumeText(resume = {}) {
       [
         project.projectTitle,
         project.role,
-        project.technologiesUsed && `Technologies Used: ${project.technologiesUsed}`,
+        project.technologiesUsed &&
+          `Technologies Used: ${project.technologiesUsed}`,
         project.projectLink && `Project Link: ${project.projectLink}`,
         project.repositoryLink && `Repository Link: ${project.repositoryLink}`,
         project.description,
-      ].filter(Boolean).join("\n")
-    )
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    ),
   );
 
   addSection(
@@ -435,16 +483,18 @@ function formatResumeText(resume = {}) {
         cert.issueDate,
         cert.credentialId && `Credential ID: ${cert.credentialId}`,
         cert.credentialLink && `Credential Link: ${cert.credentialLink}`,
-      ].filter(Boolean).join(" | ")
-    )
+      ]
+        .filter(Boolean)
+        .join(" | "),
+    ),
   );
 
   addSection(
     lines,
     "Education",
     resume.education?.map((item) =>
-      [item.degree, item.school, item.year].filter(Boolean).join(" | ")
-    )
+      [item.degree, item.school, item.year].filter(Boolean).join(" | "),
+    ),
   );
 
   return lines.filter(Boolean).join("\n");
@@ -571,9 +621,11 @@ function formatDateRange(startDate, endDate) {
 }
 
 function getResumeFileName(fullName) {
-  return String(fullName || "cvforge")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "") || "cvforge";
+  return (
+    String(fullName || "cvforge")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "cvforge"
+  );
 }

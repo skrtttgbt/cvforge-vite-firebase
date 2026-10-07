@@ -1,0 +1,84 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { doc, setDoc, getDoc, getDocs, collection, query, where, updateDoc, Timestamp, serverTimestamp, writeBatch, runTransaction } from 'firebase/firestore';
+import { filteredDraft } from '../src/utils/sharing.js';
+const env = await initializeTestEnvironment({projectId:'demo-cvforge',firestore:{host:'127.0.0.1',port:8089,rules:fs.readFileSync('firestore.rules','utf8')}});
+try {
+  await env.clearFirestore();
+  const alice=env.authenticatedContext('alice').firestore(), bob=env.authenticatedContext('bob').firestore(), guest=env.unauthenticatedContext().firestore();
+  await assertSucceeds(setDoc(doc(alice,'profiles','alice'),{uid:'alice',userId:'alice',fullName:'Alice',targetRole:'Data Analyst',skills:[]}));
+  for (const db of [bob,guest]) {
+    await assertFails(getDoc(doc(db,'profiles','alice')));
+    await assertFails(updateDoc(doc(db,'profiles','alice'),{fullName:'Other'}));
+  }
+  await assertFails(updateDoc(doc(alice,'profiles','alice'),{userId:'bob'}));
+  await assertFails(setDoc(doc(alice,'users','alice'),{role:'Employer'}));
+  const stamp=Timestamp.now();
+  const draft={status:'approved',resume:{fullName:'Alice',targetRole:'Data Analyst',professionalSummary:'SQL projects',technicalSkills:['SQL'],contact:{email:'private@example.com',phone:'123',location:'Manila'}}};
+  await setDoc(doc(alice,'resumeDrafts','alice'),{draft,config:{},updatedAt:stamp});
+  for (const db of [bob,guest]) await assertFails(getDoc(doc(db,'resumeDrafts','alice')));
+  const create = async ({maxViews=0,hasPortfolio=false,mutate=()=>{},ownerId='alice'}={}) => {
+    const id=randomUUID();
+    const t={schemaVersion:2,token:id,tokenValue:id,ownerId,sharedResourceId:id,active:true,status:'Active',expiresAt:Timestamp.fromMillis(Date.now()+600000),createdAt:serverTimestamp(),updatedAt:serverTimestamp(),viewCount:0,maxViews,allowDownload:false,accessType:hasPortfolio?'Full Access Resume & Portfolio':'Resume Only',hasResume:true,hasPortfolio,resumeUpdatedAt:stamp,portfolioUpdatedAt:hasPortfolio?stamp:null};
+    const share={schemaVersion:2,token:id,ownerId,sharedResume:filteredDraft(draft),sharedPortfolio:hasPortfolio?filteredDraft(draft):null,sharedSources:[]};
+    mutate(t,share);
+    const batch=writeBatch(alice);batch.set(doc(alice,'tokens',id),t);batch.set(doc(alice,'tokenShares',id),share);await batch.commit();return id;
+  };
+  const id=await create();
+  const snapshot=await assertSucceeds(getDoc(doc(guest,'tokenShares',id)));
+  assert.equal(snapshot.data().sharedResume.resume.contact.email,'');
+  assert.equal((await getDoc(doc(alice,'tokens',id))).data().viewCount,0);
+  // This read succeeds without increasing the counter: documented Spark limitation.
+  await assertSucceeds(getDoc(doc(guest,'tokens',id)));
+  for (const name of ['tokens','tokenShares','publicPortfolios']) await assertFails(getDocs(collection(guest,name)));
+  await assertSucceeds(getDocs(query(collection(alice,'tokens'),where('ownerId','==','alice'))));
+  await assertFails(getDocs(collection(bob,'tokens')));
+  await assertFails(create({ownerId:'bob'}));
+  await assertFails(create({mutate:(_t,s)=>{s.sharedResume.resume.contact.email='private@example.com';}}));
+  await assertFails(create({mutate:(_t,s)=>{s.sharedResume.rawProviderResponse='secret';}}));
+  await assertFails(create({mutate:t=>{t.candidateEmail='private@example.com';}}));
+  await assertFails(create({hasPortfolio:true}));
+  await setDoc(doc(alice,'webPortfolioDrafts','alice'),{userId:'alice',draft,config:{},updatedAt:stamp,visibility:'private'});
+  const full=await assertSucceeds(create({hasPortfolio:true}));
+  await assertSucceeds(getDoc(doc(guest,'tokenShares',full)));
+  await assertFails(setDoc(doc(alice,'tokens',randomUUID()),{ownerId:'alice'}));
+  await assertFails(updateDoc(doc(guest,'tokenShares',id),{'sharedResume.resume.fullName':'Other'}));
+  for (const patch of [{viewCount:10},{viewCount:-1},{allowDownload:true},{ownerId:'bob'},{expiresAt:Timestamp.fromMillis(Date.now()+9999999)}]) await assertFails(updateDoc(doc(guest,'tokens',id),patch));
+  const limited=await create({maxViews:1});
+  const redeem=()=>runTransaction(guest,async tx=>{
+    const ref=doc(guest,'tokens',limited),t=(await tx.get(ref)).data();
+    if(t.viewCount>=t.maxViews) throw new Error('exhausted');
+    const s=await tx.get(doc(guest,'tokenShares',limited));tx.update(ref,{viewCount:t.viewCount+1,updatedAt:serverTimestamp()});return s.data();
+  });
+  const attempts=await Promise.allSettled([redeem(),redeem()]);
+  assert.equal(attempts.filter(r=>r.status==='fulfilled').length,1);
+  await assertFails(getDoc(doc(guest,'tokenShares',limited)));
+  await updateDoc(doc(alice,'tokens',id),{active:false,status:'Revoked',revokedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  await assertFails(getDoc(doc(guest,'tokenShares',id)));
+  const expired=await create();
+  await env.withSecurityRulesDisabled(ctx=>updateDoc(doc(ctx.firestore(),'tokens',expired),{expiresAt:Timestamp.fromMillis(1)}));
+  await assertFails(getDoc(doc(guest,'tokens',expired)));
+  const stale=await create();
+  await updateDoc(doc(alice,'resumeDrafts','alice'),{'draft.status':'draft'});
+  await assertFails(getDoc(doc(guest,'tokenShares',stale)));
+  await assertFails(create());
+  await updateDoc(doc(alice,'resumeDrafts','alice'),{'draft.status':'approved',updatedAt:Timestamp.fromMillis(stamp.toMillis()+1000)});
+  await assertFails(getDoc(doc(guest,'tokenShares',stale)));
+  const slug=randomUUID();
+  await setDoc(doc(alice,'webPortfolioDrafts','alice'),{userId:'alice',draft,config:{},updatedAt:stamp,visibility:'private'});
+  const publish=writeBatch(alice);
+  publish.update(doc(alice,'webPortfolioDrafts','alice'),{visibility:'public',publicSlug:slug,updatedAt:serverTimestamp()});
+  publish.set(doc(alice,'publicPortfolios',slug),{schemaVersion:2,ownerId:'alice',status:'approved',visibility:'public',draft:filteredDraft(draft),publicProfile:{},publicSources:[],sourceUpdatedAt:serverTimestamp(),updatedAt:serverTimestamp()});
+  await assertSucceeds(publish.commit());
+  await assertSucceeds(getDoc(doc(guest,'publicPortfolios',slug)));
+  await assertFails(updateDoc(doc(alice,'publicPortfolios',slug),{themeStyle:'Invalid Theme',updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,'publicPortfolios',slug),{themeStyle:'Minimal White',updatedAt:serverTimestamp()}));
+  await assertFails(updateDoc(doc(alice,'publicPortfolios',slug),{publicProfile:{email:'private@example.com'},updatedAt:serverTimestamp()}));
+  await updateDoc(doc(alice,'webPortfolioDrafts','alice'),{visibility:'private'});
+  await assertFails(getDoc(doc(guest,'publicPortfolios',slug)));
+  await env.withSecurityRulesDisabled(ctx=>setDoc(doc(ctx.firestore(),'tokens','legacy'),{ownerId:'alice',active:true}));
+  await assertFails(getDoc(doc(guest,'tokens','legacy')));
+  console.log('PASS: Spark isolation, redacted atomic shares, denied lists/forgery, concurrent redemption, expiry/revocation/approval/version gates, public publishing and documented direct-read counter limitation.');
+} finally { await env.cleanup(); }

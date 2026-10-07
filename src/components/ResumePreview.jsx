@@ -1,3 +1,5 @@
+import { safeUrl } from '../utils/grounding';
+import { normalizeResume } from '../utils/resumeContent';
 export default function ResumePreview({ profile = {}, draft = null }) {
   if (!draft) {
     return (
@@ -10,10 +12,7 @@ export default function ResumePreview({ profile = {}, draft = null }) {
     );
   }
 
-  const resume = mergeResumeWithProfile(
-    buildResumeFromProfile(profile, draft),
-    draft.resume || {},
-  );
+  const resume = normalizeResume(draft.resume, profile);
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm leading-relaxed text-slate-700">
       <header className="border-b border-slate-200 pb-4 text-center">
@@ -75,7 +74,7 @@ export default function ResumePreview({ profile = {}, draft = null }) {
                   </div>
 
                   <p className="text-xs font-semibold text-slate-500">
-                    {formatDateRange(item.startDate, item.endDate)}
+                    {formatDateRange(item.startDate, item.endDate, item.isCurrent)}
                   </p>
                 </div>
 
@@ -110,7 +109,7 @@ export default function ResumePreview({ profile = {}, draft = null }) {
                   </div>
 
                   <p className="text-xs font-semibold text-slate-500">
-                    {formatDateRange(project.startDate, project.endDate)}
+                    {formatDateRange(project.startDate, project.endDate, project.isOngoing)}
                   </p>
                 </div>
 
@@ -198,7 +197,8 @@ function Section({ title, children }) {
   );
 }
 
-function formatDateRange(startDate, endDate) {
+function formatDateRange(startDate, endDate, current = false) {
+  if (current) return startDate ? `${startDate} - Present` : 'Present';
   if (!startDate && !endDate) return "";
   if (startDate && !endDate) return startDate;
   return `${startDate} - ${endDate}`;

@@ -1,49 +1,146 @@
 rules_version = '2';
+// Spark-only: owner-private records; UUID metadata + filtered tokenShares.
+// Public get requires a known ID, live approval, expiry and remaining counter.
+// Public list is denied. Counters cannot force a client to count every read.
 service cloud.firestore {
-  match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isOwner(userId) { return signedIn() && request.auth.uid == userId; }
-
-    match /users/{userId} {
-      allow create: if signedIn() && request.auth.uid == userId;
-      allow read, update, delete: if isOwner(userId);
-    }
-
-    match /profiles/{docId} {
-      allow create: if isOwner(docId) && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if isOwner(docId);
-    }
-
-    match /profileSources/{docId} {
-      allow create: if isOwner(docId) && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if isOwner(docId);
-    }
-
-    match /resumes/{docId} {
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if signedIn() && resource.data.userId == request.auth.uid;
-    }
-
-    match /portfolios/{docId} {
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if signedIn() && resource.data.userId == request.auth.uid;
-    }
-
-    match /webPortfolioDrafts/{userId} {
-      allow create: if isOwner(userId) && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isOwner(userId);
-      allow get, list: if resource.data.published == true || isOwner(userId);
-    }
-
-    match /interviews/{docId} {
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow read, update, delete: if signedIn() && resource.data.userId == request.auth.uid;
-    }
-
-    match /tokens/{tokenId} {
-      allow create: if signedIn() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.ownerId == request.auth.uid;
-      allow read: if true;
-    }
+ match /databases/{database}/documents {
+  function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+  function uuid(id) { return id is string && id.matches('[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}'); }
+  function validProfile(uid) {
+   let d=request.resource.data;
+   return d.userId == uid && d.uid == uid && d.fullName is string && d.fullName.size() <= 200
+    && d.get('targetRole','') is string && d.get('targetRole','').size() <= 200
+    && d.get('skills',[]) is list && d.get('skills',[]).size() <= 100
+    && d.get('experience',[]) is list && d.get('experience',[]).size() <= 100
+    && d.get('projects',[]) is list && d.get('projects',[]).size() <= 100
+    && d.get('certifications',[]) is list && d.get('certifications',[]).size() <= 100;
   }
+  function validDraft() {
+   let d=request.resource.data;
+   return d.draft is map && d.draft.status in ['draft','approved'] && d.draft.resume is map && d.config is map;
+  }
+  function selected(config, section) {
+   return config.get('includeSections',['About Me','Technical Skills','Work Experience','Education','Featured Projects','Certifications','Contact Links']).hasAny([section]);
+  }
+  // Compare each exposed field with the exact owner's approved output. No raw
+  // profile, provider response, arbitrary contact map or owner metadata allowed.
+  function safeSharedDraft(d, source, config) {
+   let s=source.draft.resume;
+   let c=s.get('contact',{});
+   let sections=config.get('includeSections',['About Me','Technical Skills','Work Experience','Education','Featured Projects','Certifications','Contact Links']);
+   // Exact map equality also denies additional keys and provider metadata.
+   return d == {'status':'approved','title':'Approved shared draft','resume':{
+    'fullName':s.get('fullName',''), 'targetRole':s.get('targetRole',''),
+    'professionalSummary':sections.hasAny(['About Me']) ? s.get('professionalSummary','') : '',
+    'technicalSkills':sections.hasAny(['Technical Skills']) ? s.get('technicalSkills',[]) : [],
+    'workExperience':sections.hasAny(['Work Experience']) ? s.get('workExperience',[]) : [],
+    'projects':sections.hasAny(['Featured Projects']) ? s.get('projects',[]) : [],
+    'certifications':sections.hasAny(['Certifications']) ? s.get('certifications',[]) : [],
+    'education':sections.hasAny(['Education']) ? s.get('education',[]) : [],
+    'imgUrl':s.get('imgUrl',''),
+    'contact':{'email':config.get('showEmail',false) == true ? c.get('email','') : '',
+      'phone':config.get('showPhone',false) == true ? c.get('phone','') : '',
+      'location':config.get('showAddress',false) == true ? c.get('location','') : ''}}};
+  }
+  function safeLinks(links, source) {
+   return links is list && links.size() <= 100 && links == (source.config.get('showLinks',false) == true && selected(source.config,'Contact Links') ? source.get('approvedSharedSources',[]) : []);
+  }
+  function validTokenRecord(t,id) {
+   return t.keys().hasOnly(['schemaVersion','token','tokenValue','ownerId','sharedResourceId','active','status','expiresAt','createdAt','updatedAt','viewCount','maxViews','allowDownload','accessType','hasResume','hasPortfolio','resumeUpdatedAt','portfolioUpdatedAt'])
+    && t.schemaVersion == 2 && uuid(id) && t.token == id && t.tokenValue == id && t.sharedResourceId == id
+    && t.ownerId is string && t.ownerId.size() > 0 && t.ownerId.size() <= 128
+    && t.active is bool && t.status in ['Active','Revoked']
+    && t.expiresAt is timestamp && t.createdAt is timestamp && t.updatedAt is timestamp
+    && t.viewCount is int && t.viewCount >= 0 && t.maxViews is int && t.maxViews >= 0 && t.maxViews <= 100000
+    && t.allowDownload is bool && t.hasResume is bool && t.hasPortfolio is bool && (t.hasResume || t.hasPortfolio)
+    && t.accessType == (t.hasResume && t.hasPortfolio ? 'Full Access Resume & Portfolio' : t.hasResume ? 'Resume Only' : 'Portfolio Only')
+    && (t.hasResume ? t.resumeUpdatedAt is timestamp : t.resumeUpdatedAt == null)
+    && (t.hasPortfolio ? t.portfolioUpdatedAt is timestamp : t.portfolioUpdatedAt == null);
+  }
+  function sourceApproved(collection,uid,stamp) {
+   let s=get(/databases/$(database)/documents/$(collection)/$(uid)).data;
+   return s.draft.status == 'approved' && s.updatedAt == stamp;
+  }
+  function tokenUsable(t,id) {
+   return validTokenRecord(t,id) && t.active == true && t.status == 'Active' && t.expiresAt > request.time
+    && (t.maxViews == 0 || t.viewCount < t.maxViews)
+    && (!t.hasResume || sourceApproved('resumeDrafts',t.ownerId,t.resumeUpdatedAt))
+    && (!t.hasPortfolio || sourceApproved('webPortfolioDrafts',t.ownerId,t.portfolioUpdatedAt));
+  }
+  function validTokenShare(d,id) {
+   let t=getAfter(/databases/$(database)/documents/tokens/$(id)).data;
+   let resume=getAfter(/databases/$(database)/documents/resumeDrafts/$(d.ownerId)).data;
+   let portfolio=getAfter(/databases/$(database)/documents/webPortfolioDrafts/$(d.ownerId)).data;
+   return d.keys().hasOnly(['schemaVersion','ownerId','token','sharedResume','sharedPortfolio','sharedSources'])
+    && d.schemaVersion == 2 && d.ownerId == t.ownerId && d.token == id && validTokenRecord(t,id)
+    && (t.hasResume ? resume.draft.status == 'approved' && resume.updatedAt == t.resumeUpdatedAt && safeSharedDraft(d.sharedResume,resume,{}) : d.sharedResume == null)
+    && (t.hasPortfolio ? portfolio.draft.status == 'approved' && portfolio.updatedAt == t.portfolioUpdatedAt && safeSharedDraft(d.sharedPortfolio,portfolio,portfolio.config) && safeLinks(d.sharedSources,portfolio) : d.sharedPortfolio == null && d.sharedSources == []);
+  }
+  function validPublicSnapshot(d,id) {
+   let s=getAfter(/databases/$(database)/documents/webPortfolioDrafts/$(d.ownerId)).data;
+   return d.keys().hasOnly(['schemaVersion','ownerId','status','visibility','draft','publicProfile','publicSources','sourceUpdatedAt','updatedAt','themeStyle'])
+    && d.get('themeStyle','Modern Blue') in ['Modern Blue','Minimal White']
+    && d.get('themeStyle','Modern Blue') == s.config.get('themeStyle','Modern Blue')
+    && d.schemaVersion == 2 && uuid(id) && d.status == 'approved' && d.visibility == 'public'
+    && d.updatedAt is timestamp && d.sourceUpdatedAt is timestamp
+    && d.publicProfile is map && d.publicProfile.size() == 0
+    && s.draft.status == 'approved' && s.visibility == 'public' && s.publicSlug == id && s.updatedAt == d.sourceUpdatedAt
+    && safeSharedDraft(d.draft,s,s.config) && safeLinks(d.publicSources,s);
+  }
+  match /profiles/{uid} {
+   allow read,delete: if owner(uid);
+   allow create,update: if owner(uid) && validProfile(uid);
+  }
+  match /users/{uid} {
+   allow read,delete: if owner(uid);
+   allow create,update: if owner(uid) && request.resource.data.get('role','jobseeker') in ['jobseeker','Job Seeker','seeker'];
+  }
+  match /profileSources/{uid} {
+   allow read,delete: if owner(uid);
+   allow create,update: if owner(uid) && request.resource.data.userId == uid && request.resource.data.sources is list && request.resource.data.sources.size() <= 100;
+  }
+  match /resumeDrafts/{uid} {
+   allow read,delete: if owner(uid);
+   allow create,update: if owner(uid) && validDraft();
+  }
+  match /webPortfolioDrafts/{uid} {
+   allow read,delete: if owner(uid);
+   allow create,update: if owner(uid) && request.resource.data.userId == uid && validDraft();
+  }
+  match /interviewSessions/{id} {
+   allow read,delete: if owner(resource.data.userId);
+   allow create: if owner(request.resource.data.userId) && request.resource.data.questions is list && request.resource.data.questions.size() <= 100;
+   allow update: if owner(resource.data.userId) && request.resource.data.userId == resource.data.userId && request.resource.data.questions is list && request.resource.data.questions.size() <= 100;
+  }
+  match /publicPortfolios/{id} {
+   allow get: if resource.data.schemaVersion == 2 && validPublicSnapshot(resource.data,id);
+   allow list: if false;
+   allow create: if owner(request.resource.data.ownerId) && request.resource.data.updatedAt == request.time && validPublicSnapshot(request.resource.data,id);
+   allow update: if owner(resource.data.ownerId) && request.resource.data.ownerId == resource.data.ownerId && request.resource.data.updatedAt == request.time && validPublicSnapshot(request.resource.data,id);
+   allow delete: if owner(resource.data.ownerId);
+  }
+  match /tokens/{id} {
+   allow get: if owner(resource.data.ownerId) || tokenUsable(resource.data,id);
+   allow list: if owner(resource.data.ownerId);
+   allow create: if owner(request.resource.data.ownerId) && validTokenRecord(request.resource.data,id)
+    && request.resource.data.active == true && request.resource.data.status == 'Active'
+    && request.resource.data.expiresAt > request.time && request.resource.data.viewCount == 0
+    && request.resource.data.createdAt == request.time && request.resource.data.updatedAt == request.time
+    && getAfter(/databases/$(database)/documents/tokenShares/$(id)).data.ownerId == request.auth.uid;
+   allow update: if (owner(resource.data.ownerId)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active','status','revokedAt','updatedAt'])
+    && request.resource.data.active == false && request.resource.data.status == 'Revoked')
+    || (tokenUsable(resource.data,id) && validTokenRecord(request.resource.data,id)
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewCount','updatedAt'])
+    && request.resource.data.viewCount == resource.data.viewCount + 1 && request.resource.data.updatedAt == request.time);
+   allow delete: if owner(resource.data.ownerId);
+  }
+  match /tokenShares/{id} {
+   allow get: if owner(resource.data.ownerId) || (resource.data.schemaVersion == 2 && tokenUsable(get(/databases/$(database)/documents/tokens/$(id)).data,id));
+   allow list: if false;
+   allow create: if owner(request.resource.data.ownerId) && uuid(id) && validTokenShare(request.resource.data,id);
+   allow update: if false;
+   allow delete: if owner(resource.data.ownerId);
+  }
+ }
 }

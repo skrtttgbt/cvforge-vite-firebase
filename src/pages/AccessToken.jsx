@@ -5,11 +5,7 @@ import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
 import { LockKeyhole, Link2, Eye, ShieldCheck } from "lucide-react";
-import {
-  findToken,
-  saveEmployerCandidateView,
-  incrementTokenViews,
-} from "../services/firestoreService";
+import { findToken } from "../services/firestoreService";
 
 export default function AccessToken() {
   const { tokenValue } = useParams();
@@ -41,48 +37,7 @@ export default function AccessToken() {
           return;
         }
 
-        if (token.status === "Revoked") {
-          setError("This token has been revoked by the owner.");
-          return;
-        }
-
-        const expiresAt =
-          token.expiresAt?.toDate?.() || new Date(token.expiresAt);
-
-        if (
-          expiresAt &&
-          !Number.isNaN(expiresAt.getTime()) &&
-          expiresAt < new Date()
-        ) {
-          setError("This token has expired.");
-          return;
-        }
-
-        if (token.maxViews && (token.views || 0) >= token.maxViews) {
-          setError("This token has reached its access limit.");
-          return;
-        }
-
-        const employerId = getEmployerVisitorId();
-
-        await saveEmployerCandidateView(employerId, {
-          tokenId: token.id,
-          tokenValue: token.tokenValue,
-          ownerId: token.ownerId,
-          candidateName: token.candidateName,
-          candidateRole: token.candidateRole,
-          candidateEmail: token.candidateEmail,
-          accessType: token.accessType,
-          expiresAt: token.expiresAt,
-          status: token.status || "Active",
-          shareLink: token.shareLink,
-          profileSources: token.profileSources || [],
-          portfolioUrl: token.portfolioUrl || "",
-        });
-
-        await incrementTokenViews(token.id);
-
-        navigate(`/shared-profile/${token.ownerId}`, { replace: true });
+        navigate('/shared-profile/' + cleanToken, { replace: true, state: { sharedToken: token } });
       } catch (err) {
         console.error("Token access error:", err);
         setError("Failed to verify token. Try again.");
@@ -112,7 +67,7 @@ export default function AccessToken() {
         <span className="text-sm font-bold">For ICT Job Seekers</span>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-10">
         <div className="text-center">
           <h1 className="text-4xl font-extrabold text-ink">
             Access Shared Resume or Portfolio
@@ -215,24 +170,6 @@ export default function AccessToken() {
       </main>
     </div>
   );
-}
-
-function getEmployerVisitorId() {
-  const key = "cvforge_employer_visitor_id";
-  const existingId = localStorage.getItem(key);
-
-  if (existingId) {
-    return existingId;
-  }
-
-  const newId =
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? `employer-${crypto.randomUUID()}`
-      : `employer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-  localStorage.setItem(key, newId);
-
-  return newId;
 }
 
 function Step({ icon: Icon, title, text }) {

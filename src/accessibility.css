@@ -1,0 +1,57 @@
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 10000;
+  transform: translateY(-200%);
+  background: white;
+  color: #172554;
+  padding: 12px 16px;
+  border: 2px solid #2563eb;
+}
+.skip-link:focus {
+  transform: translateY(0);
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+main,
+main > div,
+main section,
+main article,
+main .grid > *,
+main .flex > * {
+  min-width: 0;
+}
+main {
+  overflow-wrap: anywhere;
+}
+main img,
+main input,
+main select,
+main textarea {
+  max-width: 100%;
+}
+main table {
+  width: 100%;
+  table-layout: fixed;
+}
+.loading-skeleton {
+  height: 12rem;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #e2e8f0, #f8fafc, #e2e8f0);
+  background-size: 200% 100%;
+  animation: skeleton 1.5s infinite;
+}
+@keyframes skeleton {
+  to {
+    background-position: -200% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loading-skeleton {
+    animation: none;
+  }
+}

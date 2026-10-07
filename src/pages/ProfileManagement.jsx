@@ -1,3 +1,4 @@
+import { safeUrl } from '../utils/grounding';
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getIncompleteSections, normalizePhilippineMobile, validateProfile } from "../utils/profileValidation";
@@ -6,6 +7,7 @@ import ProfileSetupLayout from "../layouts/ProfileSetupLayout";
 import Button from "../components/Button";
 import Swal from "sweetalert2";
 import PersonalInformationTab from "../components/profile/tabs/PersonalInformationTab";
+import { profilePhoto } from '../utils/profilePhoto';
 import EducationTab from "../components/profile/tabs/EducationTab";
 import ExperienceTab from "../components/profile/tabs/ExperienceTab";
 import SkillsTab from "../components/profile/tabs/SkillsTab";
@@ -43,6 +45,8 @@ const defaultEducation = {
 
 const defaultForm = {
   fullName: "",
+  targetRole: "",
+  summary: "",
   email: "",
   phone: "",
   location: "",
@@ -87,10 +91,12 @@ export default function ProfileManagement({ setup = false }) {
         if (profile) {
           const profileData = {
             fullName: profile.fullName || profile.displayName || user.displayName || "",
+            targetRole: profile.targetRole || "",
+            summary: profile.summary || "",
             email: profile.email || user.email || "",
             phone: profile.phone || "",
             location: profile.location || "",
-            imgUrl: profile.imgUrl || profile.photoURL || "",
+            imgUrl: profilePhoto(profile, user),
 
             education: {
               ...defaultEducation,
@@ -124,6 +130,7 @@ export default function ProfileManagement({ setup = false }) {
         } else {
           const newUserForm = {
             ...defaultForm,
+            imgUrl: profilePhoto(null, user),
             fullName: user.displayName || "",
             email: user.email || "",
           };
@@ -151,7 +158,7 @@ export default function ProfileManagement({ setup = false }) {
   };
 
   const handlePhotoUpload = async (file) => {
-    if (!file || uploadingPhoto || !userId) return;
+    if (!file || uploadingPhoto || saving || loadError || !userId) return;
 
     setUploadingPhoto(true);
     try {
@@ -165,7 +172,6 @@ export default function ProfileManagement({ setup = false }) {
         ...prev,
         imgUrl,
       }));
-      window.dispatchEvent(new Event('profile-saved'));
 
       Swal.fire({
         toast: true,
@@ -210,8 +216,6 @@ export default function ProfileManagement({ setup = false }) {
     try {
       const saved = { ...form, phone: normalizePhilippineMobile(form.phone) };
       await saveProfile(userId, saved);
-      if (!setup) window.dispatchEvent(new Event('profile-saved'));
-
       setForm(saved);
       setOriginalForm(saved);
       const remaining = getIncompleteSections(saved);
@@ -620,14 +624,14 @@ export default function ProfileManagement({ setup = false }) {
               {!setup && <Button
                 variant="outline"
                 onClick={handleCancel}
-                disabled={saving}
+                disabled={saving || uploadingPhoto}
               >
                 Cancel
               </Button>}
 
               <Button
                 onClick={handleSave}
-                disabled={!hasChanges || saving}
+                disabled={!hasChanges || saving || uploadingPhoto}
               >
                 {saving ? "Saving..." : hasChanges
                   ? setup ? incompleteSections.length ? "Save Progress" : "Finish Setup" : "Save Changes"
@@ -664,6 +668,7 @@ export default function ProfileManagement({ setup = false }) {
           onChange={handleChange}
           onPhotoUpload={handlePhotoUpload}
           uploadingPhoto={uploadingPhoto}
+          photoDisabled={loading || saving || !!loadError || !userId}
         />
       )}
 

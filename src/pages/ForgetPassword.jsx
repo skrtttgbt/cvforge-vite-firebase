@@ -34,10 +34,6 @@ export default function ForgetPassword() {
       setSuccess(
         "A password reset link has been sent to your email address. Please check your inbox."
       );
-
-      setTimeout(() => {
-        navigate("/login");
-      }, 3000);
     } catch (err) {
       console.error(err);
 
@@ -65,7 +61,7 @@ export default function ForgetPassword() {
         <span className="text-sm font-bold">CVForge Account Recovery</span>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-10">
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl px-4 py-10">
         <div className="text-center">
           <h1 className="text-4xl font-extrabold text-ink">
             Forgot Your Password?

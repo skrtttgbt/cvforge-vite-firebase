@@ -51,9 +51,7 @@ export default function SkillsTab({
                 className="rounded-lg border border-slate-200 bg-slate-50 p-4"
               >
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <h4 className="font-bold text-forge">
-                    Skill #{index + 1}
-                  </h4>
+                  <h4 className="font-bold text-forge">Skill #{index + 1}</h4>
 
                   {isEditing && (
                     <button
@@ -90,10 +88,15 @@ export default function SkillsTab({
                     <option value="">Select Category</option>
                     <option value="Programming">Programming</option>
                     <option value="Web Development">Web Development</option>
-                    <option value="Mobile Development">Mobile Development</option>
+                    <option value="Mobile Development">
+                      Mobile Development
+                    </option>
                     <option value="Database">Database</option>
                     <option value="UI/UX Design">UI/UX Design</option>
                     <option value="Data Analytics">Data Analytics</option>
+                    <option value="Artificial Intelligence / Machine Learning">
+                      Artificial Intelligence / Machine Learning
+                    </option>
                     <option value="Cybersecurity">Cybersecurity</option>
                     <option value="Hardware / Networking">
                       Hardware / Networking

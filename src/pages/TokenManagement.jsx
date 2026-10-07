@@ -1,3 +1,4 @@
+import LoadingSkeleton from '../components/LoadingSkeleton';
 import { useEffect, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
@@ -8,8 +9,6 @@ import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
   getProfile,
-  getProfileSources,
-  getWebPortfolioDraft,
   createToken,
   getTokensByOwner,
   revokeToken,
@@ -28,7 +27,7 @@ const defaultForm = {
   accessType: "Full Access Resume & Portfolio",
   expiration: "7 Days",
   accessLimit: "Unlimited Views",
-  allowDownload: true,
+  allowDownload: false,
 };
 
 const toast = Swal.mixin({
@@ -138,41 +137,23 @@ export default function TokenManagement() {
     });
 
     try {
-      const tokenValue = crypto.randomUUID();
       const expiresAt = getExpirationDate(form.expiration);
-      const [savedSources, savedPortfolio] = await Promise.all([
-        getProfileSources(userId),
-        getWebPortfolioDraft(userId),
-      ]);
-      const profileSources = (savedSources?.sources || []).filter(
-        (source) => source.url && source.url.trim()
-      );
-      const portfolioUrl = getPublishedPortfolioUrl(savedPortfolio);
 
       const tokenData = {
-        tokenValue,
-        candidate: candidateLabel,
-        candidateName,
-        candidateRole,
-        candidateEmail: profile?.email || "",
         accessType: form.accessType,
         expiration: form.expiration,
         expiresAt,
         accessLimit: form.accessLimit,
         maxViews: getMaxViews(form.accessLimit),
-        views: 0,
         allowDownload: form.allowDownload,
-        shareLink: `${window.location.origin}/access-token/${tokenValue}`,
-        profileSources,
-        portfolioUrl,
       };
 
       const savedToken = await createToken(userId, tokenData);
 
       const newToken = {
         ...savedToken,
-        tokenValue,
-        shareLink: tokenData.shareLink,
+        tokenValue: savedToken.tokenValue,
+        shareLink: savedToken.shareLink,
       };
 
       setGeneratedToken(newToken);
@@ -366,7 +347,7 @@ Thank you.`
   if (loading) {
     return (
       <AppLayout title="Generate Access Token">
-        <p>Loading...</p>
+        <LoadingSkeleton />
       </AppLayout>
     );
   }
@@ -379,6 +360,11 @@ Thank you.`
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr_0.8fr]">
         <Card title="Set Access & Permissions">
           <div className="grid gap-4">
+            <p className="text-sm text-muted">
+              View limits count accesses through CVForge. They cannot prevent
+              direct reads before the limit is reached or copying shared content.
+              Expiration and revocation block future access.
+            </p>
             <FormField label="Candidate" as="select" value={candidateLabel}>
               <option value={candidateLabel}>{candidateLabel}</option>
             </FormField>
@@ -418,6 +404,7 @@ Thank you.`
               onChange={handleChange}
             >
               <option value="Unlimited Views">Unlimited Views</option>
+              <option value="One Time">One Time View</option>
               <option value="5 Views">5 Views</option>
               <option value="10 Views">10 Views</option>
               <option value="25 Views">25 Views</option>
@@ -649,6 +636,7 @@ function getExpirationDate(expiration) {
 }
 
 function getMaxViews(accessLimit) {
+  if (accessLimit === "One Time") return 1;
   if (accessLimit === "Unlimited Views") return null;
 
   const number = Number(accessLimit.split(" ")[0]);
@@ -684,20 +672,4 @@ function getTokenStatus(token) {
   }
 
   return token.status || "Active";
-}
-
-function getPublishedPortfolioUrl(portfolio) {
-  if (!portfolio?.published) return "";
-
-  if (portfolio.publicUrl) return portfolio.publicUrl;
-
-  if (portfolio.publicPath) {
-    return `${window.location.origin}${portfolio.publicPath}`;
-  }
-
-  if (portfolio.publicSlug) {
-    return `${window.location.origin}/portfolio/${portfolio.publicSlug}`;
-  }
-
-  return "";
 }

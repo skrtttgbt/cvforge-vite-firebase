@@ -1,3 +1,5 @@
+import { roleTopics } from "../utils/interviewRoles";
+import LoadingSkeleton from "../components/LoadingSkeleton";
 import { useEffect, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
@@ -20,7 +22,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-const focusAreaOptions = [
+const unusedFocusAreaOptions = [
   "JavaScript",
   "React",
   "APIs",
@@ -30,11 +32,11 @@ const focusAreaOptions = [
 ];
 
 const defaultConfig = {
-  targetRole: "Full Stack Developer",
+  targetRole: "",
   interviewType: "Technical + HR",
   experienceLevel: "Mid-Level",
   difficulty: "Intermediate",
-  focusAreas: focusAreaOptions,
+  focusAreas: [],
 };
 
 export default function InterviewPreparation() {
@@ -42,6 +44,9 @@ export default function InterviewPreparation() {
   const [profile, setProfile] = useState(null);
 
   const [config, setConfig] = useState(defaultConfig);
+  const focusAreaOptions = roleTopics(profile?.targetRole || "").filter(
+    Boolean,
+  );
   const [questions, setQuestions] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [feedback, setFeedback] = useState(null);
@@ -51,10 +56,25 @@ export default function InterviewPreparation() {
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [questionNotice, setQuestionNotice] = useState("");
+  const [questionSource, setQuestionSource] = useState("ai");
 
   const [sessionHistory, setSessionHistory] = useState([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [selectedHistory, setSelectedHistory] = useState(null);
+  useEffect(() => {
+    if (!showHistoryModal) return;
+    const trigger = document.activeElement;
+    document.querySelector("[role=dialog] button")?.focus();
+    const key = (e) => {
+      if (e.key === "Escape") setShowHistoryModal(false);
+    };
+    window.addEventListener("keydown", key);
+    return () => {
+      window.removeEventListener("keydown", key);
+      trigger?.focus();
+    };
+  }, [showHistoryModal]);
 
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
@@ -91,6 +111,7 @@ export default function InterviewPreparation() {
 
   const handleConfigChange = (e) => {
     const { name, value } = e.target;
+    if (name === "targetRole") return;
 
     setConfig((prev) => ({
       ...prev,
@@ -132,6 +153,7 @@ export default function InterviewPreparation() {
     try {
       const result = await generateInterviewAI("Interview Questions", {
         ...config,
+        targetRole: profile?.targetRole || "",
         profile: buildProfilePayload(profile),
       });
 
@@ -143,6 +165,8 @@ export default function InterviewPreparation() {
       }));
 
       setQuestions(generatedQuestions);
+      setQuestionNotice(result.notice || "");
+      setQuestionSource(result.source || "ai");
       setActiveIndex(0);
       setFeedback(null);
     } catch (error) {
@@ -216,6 +240,8 @@ export default function InterviewPreparation() {
       await saveInterviewSession(userId, {
         config,
         questions,
+        questionSource,
+        questionNotice,
         latestFeedback: feedback,
       });
 
@@ -234,10 +260,14 @@ export default function InterviewPreparation() {
   const loadHistorySession = (session) => {
     const loadedQuestions = session.questions || [];
 
-    setConfig(session.config || defaultConfig);
+    setConfig({ ...defaultConfig, ...session.config, targetRole: profile?.targetRole || "", focusAreas: (session.config?.focusAreas || []).filter((topic) => focusAreaOptions.includes(topic)) });
     setQuestions(loadedQuestions);
+    setQuestionSource(session.questionSource || "ai");
+    setQuestionNotice(session.questionNotice || "");
     setActiveIndex(0);
-    setFeedback(loadedQuestions?.[0]?.feedback || session.latestFeedback || null);
+    setFeedback(
+      loadedQuestions?.[0]?.feedback || session.latestFeedback || null,
+    );
     setShowHistoryModal(false);
     setSelectedHistory(null);
   };
@@ -247,7 +277,7 @@ export default function InterviewPreparation() {
   if (loading) {
     return (
       <AppLayout title="Interview Preparation">
-        <p>Loading...</p>
+        <LoadingSkeleton />
       </AppLayout>
     );
   }
@@ -258,16 +288,16 @@ export default function InterviewPreparation() {
       subtitle="Practice ICT job interviews with AI-generated questions and feedback"
       badge="Powered by AI"
     >
+      <p role="note">
+        AI-generated practice feedback. This is not an official employer or HR
+        assessment.
+      </p>
       <div className="grid gap-5 xl:grid-cols-[0.8fr_1.2fr_0.9fr]">
         <Card
           title="Interview Session Setup"
           right={
-            <Button
-              variant="outline"
-              onClick={() => setShowHistoryModal(true)}
-            >
-              <History size={16} />
-              History
+            <Button variant="outline" aria-label="Interview History" onClick={() => setShowHistoryModal(true)}>
+              <History size={20} />
             </Button>
           }
         >
@@ -276,9 +306,13 @@ export default function InterviewPreparation() {
               label="Target ICT Role"
               as="select"
               name="targetRole"
-              value={config.targetRole}
+              value={profile?.targetRole || ""}
+              disabled
               onChange={handleConfigChange}
             >
+              <option value={profile?.targetRole || ""}>
+                {profile?.targetRole || "Set target role in Profile"}
+              </option>
               <option value="Full Stack Developer">Full Stack Developer</option>
               <option value="Frontend Developer">Frontend Developer</option>
               <option value="Backend Developer">Backend Developer</option>
@@ -300,19 +334,6 @@ export default function InterviewPreparation() {
               <option value="Technical + HR">Technical + HR</option>
               <option value="Technical Only">Technical Only</option>
               <option value="HR / Behavioral Only">HR / Behavioral Only</option>
-            </FormField>
-
-            <FormField
-              label="Experience Level"
-              as="select"
-              name="experienceLevel"
-              value={config.experienceLevel}
-              onChange={handleConfigChange}
-            >
-              <option value="Entry-Level">Entry-Level</option>
-              <option value="Junior-Level">Junior-Level</option>
-              <option value="Mid-Level">Mid-Level</option>
-              <option value="Senior-Level">Senior-Level</option>
             </FormField>
 
             <FormField
@@ -369,6 +390,7 @@ export default function InterviewPreparation() {
             </span>
           }
         >
+          {questionNotice && <p role="status" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{questionNotice}</p>}
           {!questions.length ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
               <p className="font-bold text-ink">No interview session yet.</p>
@@ -400,7 +422,7 @@ export default function InterviewPreparation() {
 
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="text-xs font-bold text-forge">
-                  AI Interview Question
+                  {questionSource === "role-based" ? "Role-based Practice Question" : "AI Interview Question"}
                 </p>
 
                 <h3 className="mt-1 font-bold text-ink">
@@ -431,7 +453,7 @@ export default function InterviewPreparation() {
                 )}
 
                 {currentQuestion?.feedback?.scores && (
-                  <div className="mt-3 grid grid-cols-4 gap-2 text-xs">
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                     <Score
                       label="Relevance"
                       value={currentQuestion.feedback.scores.relevance}
@@ -443,10 +465,6 @@ export default function InterviewPreparation() {
                     <Score
                       label="Depth"
                       value={currentQuestion.feedback.scores.depth}
-                    />
-                    <Score
-                      label="Confidence"
-                      value={currentQuestion.feedback.scores.confidence}
                     />
                   </div>
                 )}
@@ -545,7 +563,12 @@ function HistoryModal({
   onLoadSession,
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Interview practice history"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4"
+    >
       <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-soft">
         <div className="flex items-center justify-between border-b border-slate-200 p-5">
           <div>
@@ -571,9 +594,7 @@ function HistoryModal({
             {sessionHistory.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-slate-500">
                 <p className="font-bold text-ink">No saved history yet.</p>
-                <p className="mt-1 text-sm">
-                  Save an interview session first.
-                </p>
+                <p className="mt-1 text-sm">Save an interview session first.</p>
               </div>
             ) : (
               sessionHistory.map((session, index) => (
@@ -652,86 +673,86 @@ function HistoryModal({
                   </Button>
                 </div>
 
-                {(selectedHistory.questions || []).map((item, questionIndex) => (
-                  <div
-                    key={`${selectedHistory.id}-${questionIndex}`}
-                    className="rounded-xl border border-slate-200 bg-white p-4"
-                  >
-                    <p className="text-xs font-bold text-forge">
-                      Question {questionIndex + 1}
-                    </p>
-
-                    <h4 className="mt-1 font-bold text-ink">
-                      {item.question}
-                    </h4>
-
-                    <p className="mt-1 text-xs text-slate-500">
-                      Category: {item.category || "General"}
-                    </p>
-
-                    <div className="mt-3 rounded-lg bg-slate-50 p-3">
-                      <p className="text-xs font-bold text-ink">Your Answer</p>
-                      <p className="mt-1 text-sm text-slate-700">
-                        {item.answer || "No answer saved."}
+                {(selectedHistory.questions || []).map(
+                  (item, questionIndex) => (
+                    <div
+                      key={`${selectedHistory.id}-${questionIndex}`}
+                      className="rounded-xl border border-slate-200 bg-white p-4"
+                    >
+                      <p className="text-xs font-bold text-forge">
+                        Question {questionIndex + 1}
                       </p>
-                    </div>
 
-                    {item.feedback?.tip && (
-                      <div className="mt-3 rounded-lg border-l-4 border-forge bg-blue-50 p-3">
-                        <p className="text-xs font-bold text-ink">AI Tip</p>
-                        <p className="mt-1 text-sm text-blue-900">
-                          {item.feedback.tip}
-                        </p>
-                      </div>
-                    )}
+                      <h4 className="mt-1 font-bold text-ink">
+                        {item.question}
+                      </h4>
 
-                    {item.feedback?.scores && (
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                        <HistoryScore
-                          label="Relevance"
-                          value={item.feedback.scores.relevance}
-                        />
-                        <HistoryScore
-                          label="Clarity"
-                          value={item.feedback.scores.clarity}
-                        />
-                        <HistoryScore
-                          label="Depth"
-                          value={item.feedback.scores.depth}
-                        />
-                        <HistoryScore
-                          label="Confidence"
-                          value={item.feedback.scores.confidence}
-                        />
-                      </div>
-                    )}
+                      <p className="mt-1 text-xs text-slate-500">
+                        Category: {item.category || "General"}
+                      </p>
 
-                    {item.feedback?.summary && (
-                      <div className="mt-3 rounded-lg bg-green-50 p-3 text-sm">
-                        <p className="font-bold text-green-700">
-                          Assessment:{" "}
-                          {item.feedback.overallAssessment || "N/A"}
-                        </p>
-
-                        <p className="mt-1 text-slate-700">
-                          {item.feedback.summary}
-                        </p>
-                      </div>
-                    )}
-
-                    {item.feedback?.improvedAnswer && (
-                      <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                      <div className="mt-3 rounded-lg bg-slate-50 p-3">
                         <p className="text-xs font-bold text-ink">
-                          Improved Answer
+                          Your Answer
                         </p>
-
                         <p className="mt-1 text-sm text-slate-700">
-                          {item.feedback.improvedAnswer}
+                          {item.answer || "No answer saved."}
                         </p>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {item.feedback?.tip && (
+                        <div className="mt-3 rounded-lg border-l-4 border-forge bg-blue-50 p-3">
+                          <p className="text-xs font-bold text-ink">AI Tip</p>
+                          <p className="mt-1 text-sm text-blue-900">
+                            {item.feedback.tip}
+                          </p>
+                        </div>
+                      )}
+
+                      {item.feedback?.scores && (
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                          <HistoryScore
+                            label="Relevance"
+                            value={item.feedback.scores.relevance}
+                          />
+                          <HistoryScore
+                            label="Clarity"
+                            value={item.feedback.scores.clarity}
+                          />
+                          <HistoryScore
+                            label="Depth"
+                            value={item.feedback.scores.depth}
+                          />
+                        </div>
+                      )}
+
+                      {item.feedback?.summary && (
+                        <div className="mt-3 rounded-lg bg-green-50 p-3 text-sm">
+                          <p className="font-bold text-green-700">
+                            Assessment:{" "}
+                            {item.feedback.overallAssessment || "N/A"}
+                          </p>
+
+                          <p className="mt-1 text-slate-700">
+                            {item.feedback.summary}
+                          </p>
+                        </div>
+                      )}
+
+                      {item.feedback?.improvedAnswer && (
+                        <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3">
+                          <p className="text-xs font-bold text-ink">
+                            Improved Answer
+                          </p>
+
+                          <p className="mt-1 text-sm text-slate-700">
+                            {item.feedback.improvedAnswer}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ),
+                )}
               </div>
             )}
           </div>

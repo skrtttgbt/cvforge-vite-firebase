@@ -1,53 +1,16 @@
 import { Bell } from "lucide-react";
-import { useEffect, useState } from "react";
-
-import { onAuthChange } from "../services/authService";
-import { getProfile } from "../services/firestoreService";
+import { useAuth } from '../contexts/AuthContext';
+import ProfileAvatar from './ProfileAvatar';
+import { profilePhoto } from '../utils/profilePhoto';
 
 export default function TopBar({ title, subtitle, badge, employer = false }) {
-  const [profile, setProfile] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(!employer);
-
-  useEffect(() => {
-    if (employer) {
-      setProfile({
-        fullName: "Employer Viewer",
-        targetRole: "HR / Recruiter Access",
-      });
-      setProfileLoading(false);
-      return;
-    }
-
-    const unsubscribe = onAuthChange(async (user) => {
-      if (!user) {
-        setProfile(null);
-        setProfileLoading(false);
-        return;
-      }
-
-      try {
-        const profileData = await getProfile(user.uid);
-
-        setProfile({
-          fullName: profileData?.fullName || user.displayName || "User",
-          targetRole: profileData?.targetRole || "ICT Job Seeker",
-          imgUrl: profileData?.imgUrl || "",
-        });
-      } catch (error) {
-        console.error("TopBar profile error:", error);
-
-        setProfile({
-          fullName: user.displayName || "User",
-          targetRole: "ICT Job Seeker",
-          imgUrl: "",
-        });
-      } finally {
-        setProfileLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, [employer]);
+  const { firebaseUser, userProfile, loading } = useAuth();
+  const profileLoading = !employer && loading;
+  const profile = employer ? { fullName:'Employer Viewer', targetRole:'HR / Recruiter Access' } : {
+    fullName: userProfile?.fullName || firebaseUser?.displayName || 'User',
+    targetRole: userProfile?.targetRole || 'ICT Job Seeker',
+    imgUrl: profilePhoto(userProfile, firebaseUser),
+  };
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
@@ -68,8 +31,8 @@ export default function TopBar({ title, subtitle, badge, employer = false }) {
 
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 border-l border-slate-200 pl-4">
-            {profile?.imgUrl ? (
-              <img
+            { !employer ? (
+              <ProfileAvatar
                 src={profile.imgUrl}
                 alt={profile.fullName || "Profile"}
                 className="h-10 w-10 rounded-full border border-slate-200 object-cover"

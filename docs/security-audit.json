@@ -1,0 +1,41 @@
+{
+  "score": 3,
+  "summary": "Spark-only prototype rules passed emulator authorization tests. Owner-private records are isolated; exact approved redacted snapshots allow only UUID get, never public list. Expiry, revocation and revisions are enforced in rules; strict per-read counting is impossible in this direct-client architecture.",
+  "findings": [
+    {
+      "check": "Client-only access counting",
+      "severity": "moderate",
+      "issue": "Bearer can read a permitted snapshot without incrementing; can consume counts without viewing.",
+      "recommendation": "Treat counts as app-level access limits; strict accounting requires a trusted gateway outside Spark-only Firebase."
+    },
+    {
+      "check": "Public AI credential",
+      "severity": "moderate",
+      "issue": "Preserved VITE_GROQ_API_KEY is public in browser output.",
+      "recommendation": "Secure secret handling needs an external backend/proxy; no paid Firebase backend added."
+    },
+    {
+      "check": "Nested type safety",
+      "severity": "minor",
+      "issue": "Private draft/profile nested content is flexible and not bounded at every leaf.",
+      "recommendation": "Version and bound owner schemas while preserving actual supported fields."
+    },
+    {
+      "check": "Delivered content",
+      "severity": "minor",
+      "issue": "Download flags and revocation cannot prevent copying or erase prior deliveries.",
+      "recommendation": "Keep policy explicit; do not promise DRM."
+    }
+  ],
+  "tested": [
+    "Owner/private isolation and role rejection",
+    "Resume-only and combined atomic redacted snapshot creation",
+    "Extra private contact/provider fields rejected",
+    "Public collection listings denied",
+    "Public metadata changes and snapshot updates denied",
+    "Concurrent app redemption permits one final view",
+    "Expired/revoked/exhausted/legacy/unapproved/stale token access denied",
+    "Public portfolio publish and private-state invalidation",
+    "Known direct-read counting bypass reproduced and disclosed"
+  ]
+}

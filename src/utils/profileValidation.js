@@ -1,4 +1,5 @@
-const text = (value) => typeof value === "string" && value.trim().length > 0;
+import { cleanFacts, safeUrl } from "./grounding.js";
+const text = (value) => typeof cleanFacts(value) === "string";
 const list = (value) => (Array.isArray(value) ? value : []);
 
 export function normalizePhilippineMobile(value) {
@@ -119,3 +120,62 @@ export function getIncompleteSections(profile = {}) {
 
 export const isProfileComplete = (profile) =>
   getIncompleteSections(profile).length === 0;
+
+export function getProfileCompletion(profile = {}) {
+  const p = cleanFacts(profile) || {};
+  const completeRow = (rows, keys) =>
+    (Array.isArray(rows) ? rows : []).some((row) =>
+      keys.every((k) => text(row?.[k])),
+    );
+  const validSection = (key, tab, required) =>
+    (p[key] || []).some(
+      (row) =>
+        required.every((field) => text(row?.[field])) &&
+        !validateProfile({ [key]: [row] }).some((error) => error.tab === tab),
+    );
+  const areas = {
+    "Personal profile":
+      text(p.fullName) &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email || "") &&
+      text(p.location),
+    Education: Object.entries(educationFields).some(([key, fields]) => {
+      const value = p.education?.[key];
+      const rows = Array.isArray(value) ? value : [value];
+      return rows.some(
+        (row) =>
+          fields.every((field) => text(row?.[field])) &&
+          !validateProfile({
+            education: { [key]: Array.isArray(value) ? [row] : row },
+          }).some((error) => error.tab === "Education"),
+      );
+    }),
+    Skills: completeRow(p.skills, [
+      "skillName",
+      "category",
+      "proficiencyLevel",
+    ]),
+    Experience: validSection("experience", "Experience", [
+      "companyName",
+      "jobTitle",
+      "startDate",
+    ]),
+    Projects: validSection("projects", "Projects", [
+      "projectTitle",
+      "role",
+      "startDate",
+    ]),
+    Certifications: validSection("certifications", "Certifications", [
+      "name",
+      "organization",
+      "issueDate",
+    ]),
+    "Professional links":
+      Object.values(p.links || {}).some((v) => Boolean(safeUrl(v))) ||
+      (p.professionalLinks || []).some((v) =>
+        Boolean(safeUrl(typeof v === "string" ? v : v.url)),
+      ),
+    "Target role": text(p.targetRole),
+  };
+  const missing = Object.keys(areas).filter((k) => !areas[k]);
+  return { completed: 8 - missing.length, total: 8, missing };
+}

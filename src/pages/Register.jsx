@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../layouts/AuthLayout'
 import FormField from '../components/FormField'
 import Button from '../components/Button'
+import TermsModal from '../components/TermsModal'
 import { Eye, EyeOff } from "lucide-react"
 import { registerWithEmail, loginWithGoogle, loginWithMicrosoft } from '../services/authservice'
 import { saveProfile, getProfile } from '../services/firestoreService.js'
@@ -13,6 +14,7 @@ export default function Register() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [agreed, setAgreed] = useState(false)
+  const [legalModal, setLegalModal] = useState('privacy')
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(null) // 'google' | 'microsoft'
   const [errors, setErrors] = useState({})
@@ -29,7 +31,7 @@ export default function Register() {
     if (!form.email.trim()) errs.email = 'Email address is required.'
     if (form.password.length < 8) errs.password = 'Password must be at least 8 characters.'
     if (form.password !== form.confirm) errs.confirm = 'Passwords do not match.'
-    if (!agreed) errs.agreed = 'You must agree to the Terms of Service.'
+    if (!agreed) errs.agreed = 'You must agree to the Terms of Service and Privacy Policy.'
     return errs
   }
 
@@ -133,25 +135,27 @@ export default function Register() {
         />
 
         <div>
-          <label className="flex items-start gap-3 text-sm text-slate-600 cursor-pointer">
+          <div className="flex items-start gap-3 text-sm text-slate-600">
             <input
               type="checkbox"
+              id="registration-agreement"
+              aria-label="I agree to the Terms of Service and Privacy Policy"
               checked={agreed}
               onChange={(e) => setAgreed(e.target.checked)}
               className="mt-1 shrink-0"
             />
 
             <span className="leading-relaxed">
-              I agree to the{" "}
-              <Link to="/terms" className="font-medium text-forge">
+              <label htmlFor="registration-agreement" className="cursor-pointer">I agree to the</label>{" "}
+              <button type="button" onClick={() => setLegalModal('terms')} className="font-medium text-forge">
                 Terms of Service
-              </Link>{" "}
+              </button>{" "}
               and{" "}
-              <Link to="/privacy" className="font-medium text-forge">
+              <button type="button" onClick={() => setLegalModal('privacy')} className="font-medium text-forge">
                 Privacy Policy
-              </Link>
+              </button>
             </span>
-          </label>
+          </div>
           {errors.agreed && <p className="mt-1 text-xs text-red-500">{errors.agreed}</p>}
         </div>
 
@@ -193,6 +197,12 @@ export default function Register() {
         Already have an account?{' '}
         <Link to="/login" className="text-forge font-medium">Log in</Link>
       </p>
+      <TermsModal
+        open={legalModal !== null}
+        type={legalModal || 'privacy'}
+        onClose={() => setLegalModal(null)}
+        onSwitch={setLegalModal}
+      />
     </AuthLayout>
   )
 }

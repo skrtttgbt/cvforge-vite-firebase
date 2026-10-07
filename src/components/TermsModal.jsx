@@ -1,10 +1,11 @@
+import { privacySections } from '../utils/privacyPolicy';
 import { useEffect, useRef } from "react";
 
 /*
  * Replace the placeholder text below with your real legal copy.
  * Each section: { heading, body }
  */
-const DOCUMENTS = {
+export const DOCUMENTS = {
   terms: {
     title: "Terms of Service",
     updated: "Last updated: October 2026",
@@ -35,32 +36,7 @@ const DOCUMENTS = {
       },
     ],
   },
-  privacy: {
-    title: "Privacy Policy",
-    updated: "Last updated: October 2026",
-    sections: [
-      {
-        heading: "1. Information we collect",
-        body: "We collect your name, email address, profile photo (when you sign in with Google or Microsoft), and the resume details you enter.",
-      },
-      {
-        heading: "2. How we use it",
-        body: "We use your information to run your account, build your resumes, and improve CVForge. We do not sell your personal data.",
-      },
-      {
-        heading: "3. Storage and security",
-        body: "Your data is stored with Firebase services and protected by access rules and encryption in transit.",
-      },
-      {
-        heading: "4. Your choices",
-        body: "You can update or delete your profile information at any time, and you can request deletion of your account.",
-      },
-      {
-        heading: "5. Contact",
-        body: "Questions about privacy? Contact the CVForge team through the support link in the app.",
-      },
-    ],
-  },
+  privacy: { title: 'Privacy Policy', updated: 'Updated October 7, 2026', sections: privacySections },
 };
 
 export default function TermsModal({ open, type = "terms", onClose, onSwitch }) {
@@ -70,6 +46,7 @@ export default function TermsModal({ open, type = "terms", onClose, onSwitch }) 
   useEffect(() => {
     if (!open) return;
 
+    const trigger = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     closeRef.current?.focus();
@@ -82,6 +59,7 @@ export default function TermsModal({ open, type = "terms", onClose, onSwitch }) 
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      trigger?.focus();
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [open, onClose]);

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Upload, UserRound } from "lucide-react";
+import { Upload } from "lucide-react";
+import ProfileAvatar from '../../ProfileAvatar';
 import Card from "../../Card";
 import FormField from "../../FormField";
 import Button from "../../Button";
@@ -11,6 +12,7 @@ export default function PersonalInformationTab({
   onChange,
   onPhotoUpload,
   uploadingPhoto = false,
+  photoDisabled = false,
 }) {
   const [phoneTouched, setPhoneTouched] = useState(false);
   const fileInputRef = useRef(null);
@@ -57,6 +59,8 @@ export default function PersonalInformationTab({
             disabled={!isEditing}
           />
 
+          <FormField label="Target ICT Role" name="targetRole" placeholder="e.g. Data Analyst" value={form.targetRole || ''} onChange={onChange} disabled={!isEditing} />
+          <FormField label="Professional Summary" name="summary" as="textarea" value={form.summary || ''} onChange={onChange} disabled={!isEditing} />
           <FormField
             label="Location"
             name="location"
@@ -72,15 +76,11 @@ export default function PersonalInformationTab({
         <Card title="Profile Photo">
           <div className="grid place-items-center gap-4">
             <div className="grid h-40 w-40 place-items-center overflow-hidden rounded-full bg-blue-100 text-forge">
-              {form.imgUrl ? (
-                <img
+                <ProfileAvatar
                   src={form.imgUrl}
                   alt={form.fullName ? `${form.fullName} profile` : "Profile"}
                   className="h-full w-full object-cover"
                 />
-              ) : (
-                <UserRound aria-hidden="true" className="h-20 w-20" />
-              )}
             </div>
 
             <input
@@ -89,14 +89,14 @@ export default function PersonalInformationTab({
               accept="image/jpeg,image/png"
               className="hidden"
               onChange={handleFileChange}
-              disabled={!isEditing || uploadingPhoto}
+              disabled={photoDisabled || uploadingPhoto}
             />
 
             <Button
               type="button"
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={!isEditing || uploadingPhoto}
+              disabled={photoDisabled || uploadingPhoto}
             >
               <Upload aria-hidden="true" className="h-4 w-4" />
               {uploadingPhoto ? "Uploading..." : form.imgUrl ? "Change Photo" : "Upload Photo"}

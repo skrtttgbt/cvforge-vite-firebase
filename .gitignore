@@ -5,3 +5,7 @@ dist
 .firebase
 firebase-debug.log
 .vercel
+
+.qa/
+!.env.example
+*-debug.log
