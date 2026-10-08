@@ -11,6 +11,7 @@ export default function ResumeApproval({
   profile,
   onApprove,
   onCancel,
+  outputName = 'Resume',
 }) {
   const [base] = useState(() => normalizeResume(resume, profile));
   const [questions] = useState(() => {
@@ -144,7 +145,7 @@ export default function ResumeApproval({
         className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
       >
         <h2 id="resume-review-title" className="text-xl font-bold">
-          Review Resume
+          Review {outputName}
         </h2>
         {question ? (
           <div key={step} className="mt-4" aria-live="polite">
@@ -210,7 +211,7 @@ export default function ResumeApproval({
               ))}
             </ul>
             <p className="mt-3 text-sm text-slate-600">
-              You can still edit your resume afterward. Saving edits requires a
+              You can still edit your {outputName.toLowerCase()} afterward. Saving edits requires a
               new review.
             </p>
             <Button

@@ -1,4 +1,6 @@
 import DraftEditor from "../components/DraftEditor";
+import PortfolioSkills from '../components/PortfolioSkills';
+import ResumeApproval from '../components/ResumeApproval';
 import PortfolioImprovements from '../components/PortfolioImprovements';
 import { getPortfolioSuggestions } from '../services/portfolioSuggestionsService';
 import { applyPortfolioSuggestions } from '../utils/portfolioSuggestions';
@@ -63,6 +65,7 @@ export default function WebPortfolio() {
   const authState = useAuth();
   const resumeRef = useRef(null);
   const [editing, setEditing] = useState(false);
+  const [reviewing,setReviewing] = useState(false);
   const [improvements, setImprovements] = useState(null);
 
   const [userId, setUserId] = useState(null);
@@ -486,23 +489,18 @@ export default function WebPortfolio() {
                 }}
               />
             )}
-            <span>
-              {portfolioDraft?.status === "approved" ? "Approved" : "Draft"}
+            <span role="status" className={`rounded-full px-3 py-1 text-sm font-semibold ${portfolioDraft?.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+              Status: {portfolioDraft ? portfolioDraft.status === "approved" ? "Approved" : "Draft" : "Not generated"}
             </span>
             {portfolioDraft?.warning && (
               <p role="alert">{portfolioDraft.warning}</p>
             )}
-            <Button
-              disabled={!portfolioDraft || portfolioDraft.status === "approved" || editing || generating || !!improvements}
-              onClick={async () => {
-                const currentPhoto=profilePhoto(authState?.userProfile || profile,authState?.firebaseUser);
-                const draft = { ...portfolioDraft, resume:{...portfolioDraft.resume,imgUrl:safeUrl(currentPhoto) || portfolioDraft.resume?.imgUrl || ''}, status: "approved" };
-                await saveWebPortfolioDraft(userId, { config, draft });
-                setPortfolioDraft(draft);
-              }}
+            {portfolioDraft?.status !== 'approved' && <Button
+              disabled={!portfolioDraft || editing || generating || !!improvements || reviewing}
+              onClick={() => setReviewing(true)}
             >
               Approve for Publishing
-            </Button>
+            </Button>}
             <Button
               onClick={handlePublishPortfolio}
               disabled={saving || portfolioDraft?.status !== "approved"}
@@ -514,6 +512,13 @@ export default function WebPortfolio() {
       </div>
 
       {improvements && <PortfolioImprovements suggestions={improvements.suggestions} notice={improvements.notice} onCancel={()=>setImprovements(null)} onComplete={createReviewedPortfolio} />}
+      {reviewing && portfolioDraft && <ResumeApproval outputName="Portfolio" resume={sharedDraft(portfolioDraft,config).resume} profile={{}} onCancel={()=>setReviewing(false)} onApprove={async resume=>{
+        const currentPhoto=profilePhoto(authState?.userProfile || profile,authState?.firebaseUser);
+        const draft={...portfolioDraft,resume:{...resume,imgUrl:safeUrl(currentPhoto) || resume.imgUrl || ''},status:'approved'};
+        await saveWebPortfolioDraft(userId,{config,draft});
+        setPortfolioDraft(draft);
+        setReviewing(false);
+      }}/>}
       <div className="hidden">
         <div ref={resumeRef}>
           <ResumePreview profile={profile} draft={resumeDraft} />
@@ -542,9 +547,9 @@ export function PortfolioPreview({
     portfolio.targetRole || profile?.targetRole || "Target ICT Role";
 
   const about =
-    portfolio.aboutMe ||
-    portfolio.professionalSummary ||
-    profile?.summary ||
+    portfolio.aboutMe ??
+    portfolio.professionalSummary ??
+    profile?.summary ??
     "No summary provided.";
 
   const skills =
@@ -567,7 +572,7 @@ export function PortfolioPreview({
     (source) => (!config || config.showLinks) && safeUrl(source.url),
   );
   const experience = portfolio.workExperience || profile?.experience || [];
-  const available = portfolioAvailability({summary: portfolio.professionalSummary || portfolio.aboutMe || profile?.summary, skills, education: educationItems, projects, certifications, experience, email, phone, location}, hasResume ? {status:'approved'} : null, connectedSources);
+  const available = portfolioAvailability({summary: about === 'No summary provided.' ? '' : about, skills, education: educationItems, projects, certifications, experience, email, phone, location}, hasResume ? {status:'approved'} : null, connectedSources);
   const included = section => available[section] && (!Array.isArray(config?.includeSections) || config.includeSections.includes(section));
 
   return (
@@ -688,7 +693,7 @@ export function PortfolioPreview({
         </div>}
 
         {included('Technical Skills') && <div id="skills">
-          <Mini title="Technical Skills" text={formatSkills(skills)} />
+          <Mini title="Technical Skills" customContent={<PortfolioSkills skills={skills} minimal={minimal} />} />
         </div>}
 
         {included('Education') && <div id="education">

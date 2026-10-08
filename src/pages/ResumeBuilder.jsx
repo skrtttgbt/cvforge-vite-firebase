@@ -343,13 +343,13 @@ export default function ResumeBuilder() {
 
           <div className="mt-5 flex flex-wrap gap-3">
             {draft?.warning && <p role="alert">{draft.warning}</p>}
-            <span>{draft?.status === "approved" ? "Approved" : "Draft"}</span>
-            <Button
-              disabled={!draft || draft.status === "approved" || editing || generating || reviewing || !!improvements}
+            <span role="status" className={`rounded-full px-3 py-1 text-sm font-semibold ${draft?.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>Status: {draft ? draft.status === "approved" ? "Approved" : "Draft" : "Not generated"}</span>
+            {draft?.status !== 'approved' && <Button
+              disabled={!draft || editing || generating || reviewing || !!improvements}
               onClick={() => setReviewing(true)}
             >
               Approve
-            </Button>
+            </Button>}
             <Button
               variant="outline"
               disabled={!draft || generating || editing}
