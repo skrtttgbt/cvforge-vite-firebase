@@ -57,6 +57,8 @@ firebase deploy --only firestore:rules,hosting
 
 The included `firebase.json` already points hosting to the `dist` folder and rewrites all routes to `index.html`.
 
+Vite embeds `VITE_*` variables when building, not when serving the deployed site. If your hosting provider builds from Git, configure `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, and `VITE_FIREBASE_APP_ID` in its build environment; `.env` is intentionally ignored by Git. Rebuild and redeploy after changing them. Production builds reject missing Firebase values to prevent deploying a site with broken authentication.
+
 ## Groq AI integration and security limitation
 
 The existing integration calls Groq directly from the browser using:

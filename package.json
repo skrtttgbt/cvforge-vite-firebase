@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/grounding.test.js tests/sharing.test.js tests/withTimeout.test.js tests/resumeContent.test.js tests/resumeSuggestions.test.js src/utils/profileValidation.test.js",
+    "test": "node --test tests/firebaseConfig.test.js tests/grounding.test.js tests/sharing.test.js tests/withTimeout.test.js tests/resumeContent.test.js tests/resumeSuggestions.test.js src/utils/profileValidation.test.js",
     "test:security": "npx -y firebase-tools@latest emulators:exec --only firestore --project demo-cvforge \"node tests/security.mjs\""
   },
   "dependencies": {

@@ -6,16 +6,11 @@ import {
   connectAuthEmulator,
 } from "firebase/auth";
 import { getFirestore, connectFirestoreEmulator } from "firebase/firestore";
+import { getFirebaseConfig } from "../utils/firebaseConfig.js";
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+const { config: firebaseConfig, missingVariables } = getFirebaseConfig(import.meta.env);
 
-const isConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
+const isConfigured = missingVariables.length === 0;
 const app = isConfigured ? initializeApp(firebaseConfig) : null;
 
 export const auth = app ? getAuth(app) : null;
@@ -26,4 +21,4 @@ if (app && import.meta.env.VITE_USE_EMULATORS === "true") {
 }
 export const googleProvider = new GoogleAuthProvider();
 export const microsoftProvider = new OAuthProvider("microsoft.com");
-export { isConfigured };
+export { isConfigured, missingVariables };

@@ -12,21 +12,26 @@ import {
   confirmPasswordReset,
 } from "firebase/auth";
 
-import { auth, googleProvider, microsoftProvider } from "./firebase";
+import { auth, googleProvider, microsoftProvider, missingVariables } from "./firebase";
+import { requireFirebaseAuth } from "../utils/firebaseConfig.js";
+
+function getConfiguredAuth() {
+  return requireFirebaseAuth(auth, missingVariables);
+}
 
 async function applyPersistence(remember = true) {
   await setPersistence(
-    auth,
+    getConfiguredAuth(),
     remember ? browserLocalPersistence : browserSessionPersistence,
   );
 }
 export function verifyResetCode(oobCode) {
-  return verifyPasswordResetCode(auth, oobCode);
+  return verifyPasswordResetCode(getConfiguredAuth(), oobCode);
 }
 
 // Sets the new password using the same oobCode.
 export function confirmReset(oobCode, newPassword) {
-  return confirmPasswordReset(auth, oobCode, newPassword);
+  return confirmPasswordReset(getConfiguredAuth(), oobCode, newPassword);
 }
 
 function normalizeEmail(email) {
@@ -37,7 +42,7 @@ export async function loginWithEmail(email, password, remember = true) {
   await applyPersistence(remember);
 
   const result = await signInWithEmailAndPassword(
-    auth,
+    getConfiguredAuth(),
     normalizeEmail(email),
     password,
   );
@@ -49,7 +54,7 @@ export async function registerWithEmail(email, password, remember = true) {
   await applyPersistence(remember);
 
   const result = await createUserWithEmailAndPassword(
-    auth,
+    getConfiguredAuth(),
     normalizeEmail(email),
     password,
   );
@@ -58,13 +63,13 @@ export async function registerWithEmail(email, password, remember = true) {
 }
 
 export async function resetPassword(email) {
-  await sendPasswordResetEmail(auth, normalizeEmail(email));
+  await sendPasswordResetEmail(getConfiguredAuth(), normalizeEmail(email));
 }
 
 export async function loginWithGoogle(remember = true) {
   await applyPersistence(remember);
 
-  const result = await signInWithPopup(auth, googleProvider);
+  const result = await signInWithPopup(getConfiguredAuth(), googleProvider);
 
   return result.user;
 }
@@ -72,13 +77,13 @@ export async function loginWithGoogle(remember = true) {
 export async function loginWithMicrosoft(remember = true) {
   await applyPersistence(remember);
 
-  const result = await signInWithPopup(auth, microsoftProvider);
+  const result = await signInWithPopup(getConfiguredAuth(), microsoftProvider);
 
   return result.user;
 }
 
 export async function logoutUser() {
-  await signOut(auth);
+  await signOut(getConfiguredAuth());
 }
 
 const authListeners = new Set();
@@ -107,5 +112,5 @@ export function onAuthChange(callback) {
 }
 
 export async function sendResetPasswordEmail(email) {
-  await sendPasswordResetEmail(auth, email);
+  await resetPassword(email);
 }

@@ -326,6 +326,9 @@ export default function Login() {
 
 function getFriendlyAuthError(code) {
   switch (code) {
+    case "auth/not-configured":
+      return "Sign-in is unavailable because this site's Firebase configuration is missing. Please contact the site administrator.";
+
     case "auth/invalid-email":
       return "That email address doesn't look right.";
 
