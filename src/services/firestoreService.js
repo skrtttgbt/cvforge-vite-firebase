@@ -1,5 +1,6 @@
 import { filteredDraft, sharedLinks, validateTokenState, isSecureId } from "../utils/sharing";
 import { draftWithProfilePhoto } from '../utils/profilePhoto';
+import { pruneResumeHistory } from '../utils/resumeHistory';
 import {
   doc,
   setDoc,
@@ -13,6 +14,7 @@ import {
   deleteDoc,
   writeBatch,
   runTransaction,
+  onSnapshot,
   Timestamp,
 } from "firebase/firestore";
 
@@ -46,7 +48,14 @@ export async function saveProfile(userId, profileData) {
           draft: {
             ...data.draft,
             status: "draft",
-            resume: { ...data.draft.resume, targetRole, ...(Object.hasOwn(profileData,'imgUrl') ? {imgUrl:profileData.imgUrl || ''} : {}) },
+            resume: {
+              ...data.draft.resume,
+              targetRole,
+              ...(Object.hasOwn(profileData,'imgUrl') &&
+              (collectionName !== 'resumeDrafts' || !data.config?.photoMode || data.config.photoMode === 'profile')
+                ? {imgUrl:profileData.imgUrl || ''}
+                : {}),
+            },
           },
           config: { ...data.config, targetRole },
           updatedAt: serverTimestamp(),
@@ -106,11 +115,21 @@ export async function getProfileSources(userId) {
   return snap.exists() ? snap.data() : null;
 }
 
-export async function saveResumeDraft(userId, data) {
+export function subscribeProfileSources(userId, onData, onError) {
+  if (!isConfigured || !userId) return () => {};
+
+  return onSnapshot(
+    doc(db, "profileSources", userId),
+    (snapshot) => onData(snapshot.exists() ? snapshot.data() : null),
+    onError,
+  );
+}
+
+export async function saveResumeDraft(userId, data, options = {}) {
   const currentProfile = await getProfile(userId);
   data = {
     ...data,
-    draft: draftWithProfilePhoto(data.draft,currentProfile),
+    draft: draftWithProfilePhoto(data.draft,currentProfile,data.config),
     config: {
       ...data.config,
       targetRole: currentProfile?.targetRole || "",
@@ -118,16 +137,36 @@ export async function saveResumeDraft(userId, data) {
   };
   if (!isConfigured) return { offline: true, data };
 
+  const resumeRef = doc(db, "resumeDrafts", userId);
+  const current = await getDoc(resumeRef);
+  const existingHistory = pruneResumeHistory(
+    current.exists() ? current.data().history : [],
+  );
+  const history = options.recordHistory
+    ? [
+        ...existingHistory,
+        {
+          id: crypto.randomUUID(),
+          label: options.label || "Saved draft",
+          savedAt: new Date().toISOString(),
+          config: data.config,
+          draft: data.draft,
+        },
+      ]
+    : existingHistory;
+  const retainedHistory = pruneResumeHistory(history);
+
   await setDoc(
-    doc(db, "resumeDrafts", userId),
+    resumeRef,
     {
       ...data,
+      history: retainedHistory,
       updatedAt: serverTimestamp(),
     },
     { merge: true },
   );
 
-  return { success: true };
+  return { success: true, data: { ...data, history: retainedHistory } };
 }
 
 export async function getResumeDraft(userId) {
@@ -135,7 +174,33 @@ export async function getResumeDraft(userId) {
 
   const snap = await getDoc(doc(db, "resumeDrafts", userId));
 
-  return snap.exists() ? snap.data() : null;
+  if (!snap.exists()) return null;
+
+  const data = snap.data();
+  const history = pruneResumeHistory(data.history);
+  if (history.length !== (Array.isArray(data.history) ? data.history.length : 0)) {
+    await setDoc(doc(db, "resumeDrafts", userId), { history }, { merge: true });
+  }
+  return { ...data, history };
+}
+
+export async function deleteResumeHistoryEntry(userId, historyId) {
+  if (!userId || !historyId) {
+    throw new Error("A user and history entry are required.");
+  }
+  if (!isConfigured) return { offline: true, history: [] };
+
+  const resumeRef = doc(db, "resumeDrafts", userId);
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(resumeRef);
+    if (!snap.exists()) return { success: true, history: [] };
+
+    const history = pruneResumeHistory(snap.data().history).filter(
+      (entry) => entry.id !== historyId,
+    );
+    transaction.set(resumeRef, { history }, { merge: true });
+    return { success: true, history };
+  });
 }
 export async function saveWebPortfolioDraft(userId, data) {
   const sources = await getProfileSources(userId);
@@ -327,4 +392,22 @@ export async function publishPortfolio(ownerId, data) {
     transaction.set(doc(db,'publicPortfolios',id),{schemaVersion:2,ownerId,status:'approved',visibility:'public',themeStyle:source.config?.themeStyle === 'Minimal White' ? 'Minimal White' : 'Modern Blue',draft:filteredDraft(source.draft,source.config),publicProfile:{},publicSources:source.approvedSharedSources || [],sourceUpdatedAt:serverTimestamp(),updatedAt:serverTimestamp()});
     return id;
   });
+}
+
+export async function unpublishPortfolio(ownerId) {
+  const sourceRef = doc(db, "webPortfolioDrafts", ownerId);
+  const sourceSnap = await getDoc(sourceRef);
+  if (!sourceSnap.exists()) throw new Error("No saved portfolio was found.");
+
+  const source = sourceSnap.data();
+  const batch = writeBatch(db);
+  batch.update(sourceRef, {
+    visibility: "private",
+    "config.visibility": "private",
+    updatedAt: serverTimestamp(),
+  });
+  if (source.publicSlug) {
+    batch.delete(doc(db, "publicPortfolios", source.publicSlug));
+  }
+  await batch.commit();
 }

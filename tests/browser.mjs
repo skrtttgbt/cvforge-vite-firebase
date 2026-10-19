@@ -262,7 +262,7 @@ try {
     "Share Email",
     "Share Phone",
     "Share Address",
-    "Share Links",
+    "Share Profile Source",
   ])
     assert.equal(
       await page.getByLabel(name, { exact: true }).isChecked(),

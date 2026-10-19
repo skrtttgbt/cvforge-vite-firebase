@@ -1,11 +1,16 @@
 import { safeUrl } from '../utils/grounding';
+import {
+  isConnectedProfileSource,
+  sourceUrlError,
+  validateSourceUrl,
+} from "../utils/sourceValidation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
 import StatusBadge from "../components/StatusBadge";
-import { Upload, Link2, ExternalLink } from "lucide-react";
+import { Link2, ExternalLink, Unlink } from "lucide-react";
 import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
@@ -74,8 +79,13 @@ export default function ProfileSources() {
   const [sources, setSources] = useState(defaultSources);
 
   const profileLinks = useMemo(() => {
-    return sources.filter((source) => source.url && source.url.trim());
+    return sources.filter(isConnectedProfileSource);
   }, [sources]);
+
+  const sourceErrors = useMemo(
+    () => sources.map((source) => sourceUrlError(source)),
+    [sources],
+  );
 
   useEffect(() => {
     const unsubscribe = onAuthChange(async (user) => {
@@ -154,33 +164,20 @@ export default function ProfileSources() {
     });
   };
 
-  const handleToggleSource = (index) => {
-    setSources((prev) => {
-      const updatedSources = [...prev];
-      const source = updatedSources[index];
-
-      updatedSources[index] = {
-        ...source,
-        status:
-          source.status === "Connected" || source.status === "Imported"
-            ? "Disconnected"
-            : "Connected",
-      };
-
-      return updatedSources;
-    });
-  };
-
-  const handleImportSource = async () => {
-    await Swal.fire({ icon: 'info', title: 'Import unavailable', text: 'CVForge currently saves source links only. Add and review facts manually in Profile Management; no source content has been imported.' });
-  };
-
   const handleSourceAction = async (index) => {
     const source = sources[index];
-    if (!safeUrl(source.url)) { Swal.fire({ icon: "error", title: "Invalid URL", text: "Use a full http:// or https:// URL." }); return; }
+    const validation = validateSourceUrl(source.name, source.url);
+    if (!validation.valid) {
+      Swal.fire({
+        icon: "error",
+        title: "Invalid source link",
+        text: validation.error || "Enter a valid source URL.",
+      });
+      return;
+    }
 
     // If pending → connect first
-    if (source.status === "Pending") {
+    if (!["Connected", "Imported"].includes(source.status)) {
       setProcessingSource(index);
 
       try {
@@ -188,7 +185,11 @@ export default function ProfileSources() {
 
         setSources((prev) => {
           const updated = [...prev];
-          updated[index].status = "Connected";
+          updated[index] = {
+            ...updated[index],
+            url: validation.url,
+            status: "Connected",
+          };
           return updated;
         });
 
@@ -207,15 +208,10 @@ export default function ProfileSources() {
     }
 
     // If connected → import
-    if (source.status === "Connected") {
-      await handleImportSource(index);
-      return;
-    }
-
     // If imported → disconnect confirmation
     const result = await Swal.fire({
       title: "Disconnect?",
-      text: `Remove ${source.name}?`,
+      text: `Stop sharing ${source.name} as a connected profile source?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, disconnect",
@@ -265,30 +261,31 @@ export default function ProfileSources() {
               value={source.url}
               onChange={(e) => handleSourceUrlChange(index, e.target.value)}
               placeholder={`Enter your ${source.name} URL`}
+              error={sourceErrors[index]}
             />
 
             <Button
               className="mt-4 w-full"
               variant={
-                source.status === "Imported"
-                  ? "primary"
-                  : source.status === "Connected"
+                ["Connected", "Imported"].includes(source.status)
                   ? "secondary"
                   : "outline"
               }
               onClick={() => handleSourceAction(index)}
-              disabled={!source.url.trim() || processingSource === index}
+              disabled={
+                !source.url.trim() ||
+                Boolean(sourceErrors[index]) ||
+                processingSource === index
+              }
             >
               {processingSource === index ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
                   Processing...
                 </div>
-              ) : source.status === "Imported" ? (
-                "Imported"
-              ) : source.status === "Connected" ? (
+              ) : ["Connected", "Imported"].includes(source.status) ? (
                 <>
-                  <Upload size={16} /> Import
+                  <Unlink size={16} /> Disconnect
                 </>
               ) : (
                 <>
@@ -302,7 +299,7 @@ export default function ProfileSources() {
 
       <Card
         className="mt-5"
-        title="Profile Links"
+        title="Connected Profile Sources"
         right={
           saveStatus ? (
             <span className={`text-xs font-bold ${saveStatus === "Unable to save" ? "text-red-600" : "text-slate-500"}`}>
@@ -313,7 +310,7 @@ export default function ProfileSources() {
       >
         {profileLinks.length === 0 ? (
           <p className="text-sm text-slate-500">
-            No profile links added yet. Add a URL above to show it here.
+            No connected profile sources yet.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -338,11 +335,14 @@ export default function ProfileSources() {
 }
 
 function normalizeSourcesForSave(sources) {
-  return sources.map((source) => ({
-    ...source,
-    url: source.url || "",
-    status: source.url?.trim() ? source.status : "Disconnected",
-  }));
+  return sources.map((source) => {
+    const validation = validateSourceUrl(source.name, source.url);
+    return {
+      ...source,
+      url: validation.valid ? validation.url : "",
+      status: validation.valid ? source.status : "Disconnected",
+    };
+  });
 }
 
 function normalizeSavedSources(savedSources) {
@@ -355,7 +355,11 @@ function normalizeSavedSources(savedSources) {
 
     if (!savedSource) return defaultSource;
 
-    const url = savedSource.url || "";
+    const validation = validateSourceUrl(
+      defaultSource.name,
+      savedSource.url || "",
+    );
+    const url = validation.valid ? validation.url : "";
 
     const savedStatus = ["Pending", "Connected", "Imported"].includes(
       savedSource.status

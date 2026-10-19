@@ -63,6 +63,7 @@ export default function EmployerOutput() {
             photoSrc={data.draft?.resume?.imgUrl}
             draft={data.draft}
             profileSources={data.sources || []}
+            sourcesAreShared
             hasResume={false}
             showContact={showContact}
             onToggleContact={() => setShowContact((value) => !value)}

@@ -20,6 +20,8 @@ export default function Register() {
   const [errors, setErrors] = useState({})
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [registeredUser, setRegisteredUser] = useState(null);
+  const isBusy = loading || oauthLoading !== null;
 
   function set(field) {
     return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))
@@ -37,22 +39,30 @@ export default function Register() {
 
   async function handleRegister(e) {
     e.preventDefault()
+    if (isBusy) return
     const errs = validate()
     if (Object.keys(errs).length) return setErrors(errs)
     setErrors({})
     setLoading(true)
+    let user = registeredUser
     try {
-      const user = await registerWithEmail(form.email, form.password)
+      if (!user) {
+        user = await registerWithEmail(form.email, form.password)
+        setRegisteredUser(user)
+      }
       await saveProfile(user.uid, { fullName: form.name.trim(), email: user.email })
       navigate('/complete-profile', { replace: true })
     } catch (err) {
-      setErrors({ global: getFriendlyError(err.code) })
+      setErrors({ global: user
+        ? 'Your account was created, but your profile could not be saved. Check your connection and select Continue to Profile to retry. If this continues, log in to finish your profile.'
+        : getFriendlyError(err.code) })
     } finally {
       setLoading(false)
     }
   }
 
   async function handleOAuth(provider) {
+    if (isBusy || registeredUser) return
     setErrors({})
     setOauthLoading(provider)
     try {
@@ -86,6 +96,8 @@ export default function Register() {
           value={form.name}
           onChange={set('name')}
           error={errors.name}
+          disabled={isBusy}
+          autoComplete="name"
           required
         />
         <FormField
@@ -95,6 +107,8 @@ export default function Register() {
           value={form.email}
           onChange={set('email')}
           error={errors.email}
+          disabled={isBusy || Boolean(registeredUser)}
+          autoComplete="email"
           required
         />
         <FormField
@@ -104,6 +118,8 @@ export default function Register() {
           value={form.password}
           onChange={set('password')}
           error={errors.password}
+          disabled={isBusy || Boolean(registeredUser)}
+          autoComplete="new-password"
           required
           rightIcon={
             <button
@@ -122,6 +138,8 @@ export default function Register() {
           value={form.confirm}
           onChange={set('confirm')}
           error={errors.confirm}
+          disabled={isBusy || Boolean(registeredUser)}
+          autoComplete="new-password"
           required
           rightIcon={
             <button
@@ -141,6 +159,7 @@ export default function Register() {
               id="registration-agreement"
               aria-label="I agree to the Terms of Service and Privacy Policy"
               checked={agreed}
+              disabled={isBusy}
               onChange={(e) => setAgreed(e.target.checked)}
               className="mt-1 shrink-0"
             />
@@ -160,11 +179,11 @@ export default function Register() {
         </div>
 
         {errors.global && (
-          <p className="text-sm text-red-500 text-center">{errors.global}</p>
+          <p role="alert" className="text-sm text-red-500 text-center">{errors.global}</p>
         )}
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? 'Creating account…' : 'Create Account'}
+        <Button type="submit" className="w-full" disabled={isBusy}>
+          {loading ? (registeredUser ? 'Saving profile...' : 'Creating account...') : (registeredUser ? 'Continue to Profile' : 'Create Account')}
         </Button>
       </form>
 
@@ -174,23 +193,23 @@ export default function Register() {
         <hr className="flex-1" />
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3">
         <Button
           variant="outline"
           type="button"
-          disabled={oauthLoading !== null}
+          disabled={isBusy || Boolean(registeredUser)}
           onClick={() => handleOAuth('google')}
         >
           {oauthLoading === 'google' ? 'Redirecting…' : 'Continue with Google'}
         </Button>
-        <Button
+        {/* <Button
           variant="outline"
           type="button"
-          disabled={oauthLoading !== null}
+          disabled={isBusy || Boolean(registeredUser)}
           onClick={() => handleOAuth('microsoft')}
         >
           {oauthLoading === 'microsoft' ? 'Redirecting…' : 'Continue with Microsoft'}
-        </Button>
+        </Button> */}
       </div>
 
       <p className="mt-6 text-center text-sm text-slate-500">
@@ -209,6 +228,18 @@ export default function Register() {
 
 function getFriendlyError(code) {
   switch (code) {
+    case 'auth/not-configured':
+      return 'Account creation is unavailable because this site is missing its Firebase configuration.'
+    case 'auth/operation-not-allowed':
+      return 'This sign-in method is disabled. Enable it in Firebase Authentication before trying again.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please wait and try again.'
+    case 'auth/password-does-not-meet-requirements':
+      return 'This password does not meet the account security requirements. Try a longer password with uppercase and lowercase letters, numbers, and symbols.'
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized for sign-in. Please contact the site administrator.'
+    case 'auth/popup-blocked':
+      return 'The sign-in popup was blocked. Allow popups and try again.'
     case 'auth/email-already-in-use':
       return 'An account with this email already exists.'
     case 'auth/invalid-email':

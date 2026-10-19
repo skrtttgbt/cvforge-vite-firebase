@@ -7,8 +7,21 @@ export default function FormField({
   as = "input",
   children,
   rightIcon,
+  error,
+  id,
+  'aria-describedby': describedBy,
   ...props
-}) { const common =
+}) {
+  const generatedId = useId();
+  const fieldId = id || generatedId;
+  const errorId = `${fieldId}-error`;
+  const fieldProps = {
+    ...props,
+    id: fieldId,
+    'aria-invalid': error ? true : props['aria-invalid'],
+    'aria-describedby': [describedBy, error ? errorId : null].filter(Boolean).join(' ') || undefined,
+  };
+  const common =
     "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-forge focus:ring-4 focus:ring-blue-100";
 
   return (
@@ -18,9 +31,9 @@ export default function FormField({
       </span>
 
       {as === "textarea" ? (
-        <textarea className={common} rows={4} {...props} />
+        <textarea className={common} rows={4} {...fieldProps} />
       ) : as === "select" ? (
-        <select className={common} {...props}>
+        <select className={common} {...fieldProps}>
           {children}
         </select>
       ) : (
@@ -28,7 +41,7 @@ export default function FormField({
           <input
             type={type}
             className={`${common} ${rightIcon ? "pr-10" : ""}`}
-            {...props}
+            {...fieldProps}
           />
 
           {rightIcon && (
@@ -38,6 +51,7 @@ export default function FormField({
           )}
         </div>
       )}
+      {error && <span id={errorId} role="alert" className="mt-1 block text-xs text-red-500">{error}</span>}
     </label>
   );
 }

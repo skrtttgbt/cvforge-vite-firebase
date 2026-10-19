@@ -1,5 +1,5 @@
 import { normalizeResume } from './resumeContent.js';
-import { safeUrl } from './grounding.js';
+import { isConnectedProfileSource } from './sourceValidation.js';
 export function portfolioAvailability(profile = {}, resumeDraft = null, sources = []) {
   const r = normalizeResume(undefined, profile || {});
   const named = (rows, keys) => rows.some(row => keys.some(key => typeof row[key] === 'string' && row[key].trim()));
@@ -11,7 +11,8 @@ export function portfolioAvailability(profile = {}, resumeDraft = null, sources 
     'Certifications': named(r.certifications, ['name', 'certificationName']),
     'Work Experience': named(r.workExperience, ['jobTitle', 'companyName', 'description']),
     'Resume Download': resumeDraft?.status === 'approved',
-    'Contact Links': Boolean(r.contact.email || r.contact.phone || r.contact.location || sources.some(source => safeUrl(source.url))),
+    'Contact Information': Boolean(r.contact.email || r.contact.phone || r.contact.location),
+    'Profile Sources': sources.some(isConnectedProfileSource),
   };
 }
 
@@ -21,6 +22,6 @@ export function portfolioContactAvailability(profile = {}, sources = []) {
     showEmail: Boolean(contact.email.trim()),
     showPhone: Boolean(contact.phone.trim()),
     showAddress: Boolean(contact.location.trim()),
-    showLinks: sources.some(source => Boolean(safeUrl(source?.url))),
+    showLinks: sources.some(isConnectedProfileSource),
   };
 }

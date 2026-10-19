@@ -22,7 +22,7 @@ export default function PortfolioSkills({ skills = [], minimal = false }) {
     .filter((skill) => skill.name.trim());
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <p className="text-xs text-slate-500">
         Proficiency levels provided by the candidate.
       </p>
@@ -34,7 +34,7 @@ export default function PortfolioSkills({ skills = [], minimal = false }) {
           ) + 1;
         return (
           <div key={`${skill.name}-${index}`}>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="font-semibold text-ink">{skill.name}</p>
                 {skill.category && (

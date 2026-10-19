@@ -2,14 +2,16 @@ import { useState } from 'react';
 import Button from './Button';
 import { normalizeResume, resumeSections } from '../utils/resumeContent';
 const label = key => String(key ?? 'Content').replace(/([A-Z])/g,' $1').replace(/^./, c=>c.toUpperCase());
-export default function DraftEditor({ resume, onSave, onCancel }) {
+export default function DraftEditor({ resume, onSave, onCancel, onChange }) {
   const [value,setValue]=useState(()=>normalizeResume(resume));
   const [error,setError]=useState('');
   const [saving,setSaving]=useState(false);
   const update=(path,next)=>setValue(previous=>{
     const copy=structuredClone(previous);let current=copy;
     for(const key of path.slice(0,-1)) current=current[key];
-    current[path.at(-1)]=next;return copy;
+    current[path.at(-1)]=next;
+    onChange?.(normalizeResume(copy));
+    return copy;
   });
   function fields(item,path=[]) {
     const key=path.at(-1);

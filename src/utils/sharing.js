@@ -1,4 +1,5 @@
 import { safeUrl, sharedDraft } from './grounding.js';
+import { isConnectedProfileSource } from './sourceValidation.js';
 
 export const isSecureId = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 export const resumeFields = ['fullName','targetRole','professionalSummary','technicalSkills','workExperience','projects','certifications','education','imgUrl','contact'];
@@ -13,8 +14,9 @@ export function filteredDraft(draft, config = {}) {
   return sharedDraft({ status:'approved', title:'Approved shared draft', resume }, config);
 }
 export function sharedLinks(sources, config = {}) {
-  if (config.showLinks !== true || (Array.isArray(config.includeSections) && !config.includeSections.includes('Contact Links'))) return [];
-  return (Array.isArray(sources) ? sources : []).slice(0,100).flatMap(source => {
+  const sourceSectionSelected = !Array.isArray(config.includeSections) || config.includeSections.includes('Profile Sources') || config.includeSections.includes('Contact Links');
+  if (config.showLinks !== true || !sourceSectionSelected) return [];
+  return (Array.isArray(sources) ? sources : []).filter(isConnectedProfileSource).slice(0,100).flatMap(source => {
     const url = safeUrl(source.url);
     return url ? [{ name:String(source.name || 'Professional link').slice(0,100), url }] : [];
   });

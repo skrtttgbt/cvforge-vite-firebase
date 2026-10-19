@@ -182,10 +182,11 @@ export function factualResume(profile = {}) {
 export function sharedDraft(draft, config = {}) {
   const copy = structuredClone(draft);
   if (!copy?.resume) return copy;
+  const contactSelected = !Array.isArray(config.includeSections) || config.includeSections.includes("Contact Information") || config.includeSections.includes("Contact Links");
   copy.resume.contact = {
-    email: config.showEmail ? copy.resume.contact?.email || "" : "",
-    phone: config.showPhone ? copy.resume.contact?.phone || "" : "",
-    location: config.showAddress ? copy.resume.contact?.location || "" : "",
+    email: contactSelected && config.showEmail ? copy.resume.contact?.email || "" : "",
+    phone: contactSelected && config.showPhone ? copy.resume.contact?.phone || "" : "",
+    location: contactSelected && config.showAddress ? copy.resume.contact?.location || "" : "",
   };
   if (Array.isArray(config.includeSections)) {
     for (const [key, section] of Object.entries({

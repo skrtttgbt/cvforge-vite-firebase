@@ -33,6 +33,8 @@ test('existing drafts pick up the saved Cloudinary photo without changing approv
   assert.deepEqual(updated.resume.education,[]);
   assert.equal(draft.resume.imgUrl,'https://example.com/old.jpg');
   assert.equal(draftWithProfilePhoto(draft,{}),draft);
+  assert.equal(draftWithProfilePhoto(draft,{imgUrl:url},{photoMode:'none'}).resume.imgUrl,'');
+  assert.equal(draftWithProfilePhoto(draft,{imgUrl:url},{photoMode:'custom',customPhotoUrl:'https://example.com/custom.jpg'}).resume.imgUrl,'https://example.com/custom.jpg');
 });
 
 test('portfolio approvals apply only approved wording and preserve profile records', () => {
@@ -52,14 +54,17 @@ test('portfolio approvals apply only approved wording and preserve profile recor
 
 test('portfolio sharing options disable absent contacts and invalid source links', () => {
   assert.deepEqual(portfolioContactAvailability({}, [{url:''},{url:'javascript:alert(1)'}]), {showEmail:false,showPhone:false,showAddress:false,showLinks:false});
-  assert.deepEqual(portfolioContactAvailability({email:'person@example.com',phone:'123',location:'Manila'},[{url:'https://example.com'}]), {showEmail:true,showPhone:true,showAddress:true,showLinks:true});
+  assert.deepEqual(portfolioContactAvailability({email:'person@example.com',phone:'123',location:'Manila'},[{name:'Personal Website',url:'https://example.com',status:'Connected'}]), {showEmail:true,showPhone:true,showAddress:true,showLinks:true});
 });
 
 test('portfolio options require supplied facts and an approved resume', () => {
   const empty=portfolioAvailability({summary:'',skills:[{skillName:''}],education:{college:[{schoolName:''}]},projects:[{}],experience:[{}],certifications:[{}]});
   assert.ok(Object.values(empty).every(value=>!value));
-  const available=portfolioAvailability({summary:'Build SQL reports.',skills:['SQL'],education:{college:[{schoolName:'College'}]},projects:[{projectTitle:'Reports'}],experience:[{companyName:'Team'}],certifications:[{name:'Certificate'}],email:'test@example.com'},{status:'approved'});
+  const available=portfolioAvailability({summary:'Build SQL reports.',skills:['SQL'],education:{college:[{schoolName:'College'}]},projects:[{projectTitle:'Reports'}],experience:[{companyName:'Team'}],certifications:[{name:'Certificate'}],email:'test@example.com'},{status:'approved'},[{name:'GitHub',url:'https://github.com/applicant',status:'Connected'}]);
   assert.ok(Object.values(available).every(Boolean));
+  const contactOnly=portfolioAvailability({email:'test@example.com'});
+  assert.equal(contactOnly['Contact Information'],true);
+  assert.equal(contactOnly['Profile Sources'],false);
   assert.equal(portfolioAvailability({}, {status:'draft'})['Resume Download'],false);
 });
 test('strings and profile field names render as named skills and education',()=>{

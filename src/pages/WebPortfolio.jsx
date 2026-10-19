@@ -1,4 +1,4 @@
-import DraftEditor from "../components/DraftEditor";
+import VisualTemplateEditor from "../components/VisualTemplateEditor";
 import PortfolioSkills from '../components/PortfolioSkills';
 import ResumeApproval from '../components/ResumeApproval';
 import PortfolioImprovements from '../components/PortfolioImprovements';
@@ -9,6 +9,7 @@ import { profilePhoto } from '../utils/profilePhoto';
 import { useAuth } from '../contexts/AuthContext';
 import { portfolioAvailability, portfolioContactAvailability } from '../utils/portfolioSections';
 import { safeUrl } from "../utils/grounding";
+import { isConnectedProfileSource } from "../utils/sourceValidation";
 import LoadingSkeleton from "../components/LoadingSkeleton";
 import { sharedDraft } from "../utils/grounding";
 import { useEffect, useRef, useState } from "react";
@@ -22,11 +23,13 @@ import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
 import {
   publishPortfolio,
+  unpublishPortfolio,
   getProfile,
   getProfileSources,
   getResumeDraft,
   getWebPortfolioDraft,
   saveWebPortfolioDraft,
+  subscribeProfileSources,
 } from "../services/firestoreService";
 import { generateAIContent } from "../services/aiService";
 import {
@@ -36,6 +39,10 @@ import {
   RefreshCw,
   Globe,
   ExternalLink,
+  Link2,
+  MapPin,
+  Pencil,
+  Phone,
 } from "lucide-react";
 
 const includeOptions = [
@@ -46,8 +53,26 @@ const includeOptions = [
   "Resume Download",
   "Certifications",
   "Work Experience",
-  "Contact Links",
+  "Contact Information",
+  "Profile Sources",
 ];
+
+function normalizeIncludeSections(sections) {
+  const selected = Array.isArray(sections) ? [...sections] : [...includeOptions];
+  if (selected.includes("Contact Links")) {
+    if (!selected.includes("Contact Information")) selected.push("Contact Information");
+    if (!selected.includes("Profile Sources")) selected.push("Profile Sources");
+  }
+  return withLegacyContactSection(selected);
+}
+
+function withLegacyContactSection(sections) {
+  const selected = sections.filter((section) => section !== "Contact Links");
+  if (selected.includes("Contact Information") || selected.includes("Profile Sources")) {
+    selected.push("Contact Links");
+  }
+  return selected;
+}
 
 const defaultConfig = {
   portfolioTitle: "",
@@ -58,7 +83,7 @@ const defaultConfig = {
   showPhone: false,
   showAddress: false,
   showLinks: false,
-  includeSections: includeOptions,
+  includeSections: withLegacyContactSection(includeOptions),
 };
 
 export default function WebPortfolio() {
@@ -79,6 +104,8 @@ export default function WebPortfolio() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [savedFingerprint, setSavedFingerprint] = useState("");
   const [downloading, setDownloading] = useState(false);
   const [showContact, setShowContact] = useState(false);
   const [error, setError] = useState("");
@@ -117,21 +144,28 @@ export default function WebPortfolio() {
             savedPortfolioDraft?.config?.themeStyle || defaultConfig.themeStyle,
           visibility:
             savedPortfolioDraft?.visibility === "public" ? "public" : "private",
-          includeSections:
-            savedPortfolioDraft?.config?.includeSections ||
-            defaultConfig.includeSections,
+          includeSections: normalizeIncludeSections(
+            savedPortfolioDraft?.config?.includeSections,
+          ),
         };
 
         const available = portfolioAvailability(savedProfile, savedResumeDraft?.draft, savedSources?.sources || []);
-        initialConfig.includeSections = initialConfig.includeSections.filter(section => available[section]);
-        setConfig({
+        initialConfig.includeSections = withLegacyContactSection(
+          initialConfig.includeSections.filter(
+            (section) => section === "Contact Links" || available[section],
+          ),
+        );
+        const loadedConfig = {
           ...initialConfig,
           showEmail: savedPortfolioDraft?.config?.showEmail === true,
           showPhone: savedPortfolioDraft?.config?.showPhone === true,
           showAddress: savedPortfolioDraft?.config?.showAddress === true,
           showLinks: savedPortfolioDraft?.config?.showLinks === true,
-        });
-        setPortfolioDraft(savedPortfolioDraft?.draft || null);
+        };
+        const loadedDraft = savedPortfolioDraft?.draft || null;
+        setConfig(loadedConfig);
+        setPortfolioDraft(loadedDraft);
+        setSavedFingerprint(portfolioFingerprint(loadedDraft, loadedConfig));
       } catch (error) {
         console.error("Error loading portfolio data:", error);
         setError("Failed to load portfolio data.");
@@ -143,16 +177,33 @@ export default function WebPortfolio() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!userId) return undefined;
+    return subscribeProfileSources(
+      userId,
+      (savedSources) => setProfileSources(savedSources?.sources || []),
+      (subscriptionError) => {
+        console.error("Profile source subscription error:", subscriptionError);
+        setError("Connected profile sources could not be refreshed.");
+      },
+    );
+  }, [userId]);
+
   const handleConfigChange = (e) => {
     const { name, value, checked, type } = e.target;
-    if (type === 'checkbox' && (!config.includeSections.includes('Contact Links') || !availableContacts[name])) return;
-    const nextConfig = { ...config, [name]: type === 'checkbox' ? checked : value };
+    const requiredSection = name === "showLinks" ? "Profile Sources" : "Contact Information";
+    if (type === 'checkbox' && (!config.includeSections.includes(requiredSection) || !availableContacts[name])) return;
+    const nextConfig = {
+      ...config,
+      [name]: type === 'checkbox' ? checked : value,
+      visibility: portfolioDraft ? "private" : config.visibility,
+    };
     setPortfolioDraft((prev) => {
       if (!prev) return prev;
       const draft = { ...prev, status: "draft" };
-      saveWebPortfolioDraft(userId, { config: nextConfig, draft }).catch((error) =>
-        setError(error.message),
-      );
+      saveWebPortfolioDraft(userId, { config: nextConfig, draft })
+        .then(() => setSavedFingerprint(portfolioFingerprint(draft, nextConfig)))
+        .catch((error) => setError(error.message));
       return draft;
     });
 
@@ -161,13 +212,29 @@ export default function WebPortfolio() {
 
   const handleSectionToggle = (section) => {
     if (!availableSections[section]) return;
-    const nextConfig = { ...config, includeSections: config.includeSections.includes(section) ? config.includeSections.filter(item => item !== section) : [...config.includeSections, section] };
+    const removing = config.includeSections.includes(section);
+    const includeSections = withLegacyContactSection(
+      removing
+        ? config.includeSections.filter(item => item !== section)
+        : [...config.includeSections, section],
+    );
+    const nextConfig = {
+      ...config,
+      visibility: portfolioDraft ? "private" : config.visibility,
+      includeSections,
+      ...(removing && section === "Contact Information"
+        ? { showEmail: false, showPhone: false, showAddress: false }
+        : {}),
+      ...(removing && section === "Profile Sources"
+        ? { showLinks: false }
+        : {}),
+    };
     setPortfolioDraft((prev) => {
       if (!prev) return prev;
       const draft = { ...prev, status: "draft" };
-      saveWebPortfolioDraft(userId, { config: nextConfig, draft }).catch((error) =>
-        setError(error.message),
-      );
+      saveWebPortfolioDraft(userId, { config: nextConfig, draft })
+        .then(() => setSavedFingerprint(portfolioFingerprint(draft, nextConfig)))
+        .catch((error) => setError(error.message));
       return draft;
     });
     setConfig(nextConfig);
@@ -197,9 +264,11 @@ export default function WebPortfolio() {
 
   const createReviewedPortfolio = async suggestions => {
     const result={title:'Reviewed Portfolio Draft',status:'draft',resume:applyPortfolioSuggestions(improvements.profile,suggestions)};
-    await saveWebPortfolioDraft(userId,{config:improvements.config,draft:result});
-    setConfig(improvements.config);
+    const privateConfig = { ...improvements.config, visibility: "private" };
+    await saveWebPortfolioDraft(userId,{config:privateConfig,draft:result});
+    setConfig(privateConfig);
     setPortfolioDraft(result);
+    setSavedFingerprint(portfolioFingerprint(result, privateConfig));
     setImprovements(null);
     setEditing(false);
   };
@@ -223,7 +292,7 @@ export default function WebPortfolio() {
         draft: portfolioDraft,
       });
 
-      alert("Portfolio draft saved.");
+      setSavedFingerprint(portfolioFingerprint(portfolioDraft, config));
     } catch (error) {
       console.error("Error saving portfolio draft:", error);
       alert("Failed to save portfolio draft.");
@@ -242,6 +311,7 @@ export default function WebPortfolio() {
       confirmButtonText: "Make Public",
     });
     if (!confirmation.isConfirmed) return;
+    setPublishing(true);
     try {
       const id = await publishPortfolio(userId, {
         draft: portfolioDraft,
@@ -249,13 +319,47 @@ export default function WebPortfolio() {
         publicSlug: config.slug,
       });
 
-      setConfig((prev) => ({ ...prev, slug: id, visibility: "public" }));
+      const publicConfig = { ...config, slug: id, visibility: "public" };
+      setConfig(publicConfig);
+      setSavedFingerprint(portfolioFingerprint(portfolioDraft, publicConfig));
       Swal.fire({
         title: "Portfolio Published",
         text: window.location.origin + "/p/" + id,
       });
     } catch (error) {
       setError(error.message);
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const handleMakePrivate = async () => {
+    if (!userId || config.visibility !== "public") return;
+    const confirmation = await Swal.fire({
+      title: "Make Portfolio Private?",
+      text: "The public portfolio link will stop working. Your saved portfolio will remain available here and for token sharing.",
+      showCancelButton: true,
+      cancelButtonText: "Cancel",
+      confirmButtonText: "Make Private",
+    });
+    if (!confirmation.isConfirmed) return;
+
+    setPublishing(true);
+    setError("");
+    try {
+      await unpublishPortfolio(userId);
+      const privateConfig = { ...config, visibility: "private" };
+      setConfig(privateConfig);
+      setSavedFingerprint(portfolioFingerprint(portfolioDraft, privateConfig));
+      await Swal.fire({
+        icon: "success",
+        title: "Portfolio Is Private",
+        text: "Your saved portfolio is no longer publicly accessible.",
+      });
+    } catch (error) {
+      setError(error.message || "Unable to make the portfolio private.");
+    } finally {
+      setPublishing(false);
     }
   };
 
@@ -317,13 +421,17 @@ export default function WebPortfolio() {
     );
   }
 
+  const portfolioSaved = Boolean(portfolioDraft) &&
+    savedFingerprint === portfolioFingerprint(portfolioDraft, config);
+  const portfolioIsPublic = config.visibility === "public";
+
   return (
     <AppLayout
       title="Web Portfolio Generator"
       subtitle="Create and customize your professional online portfolio"
       badge="AI Enhanced"
     >
-      <div className="grid gap-5 xl:grid-cols-[0.9fr_1.5fr]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(260px,0.6fr)_minmax(0,1.8fr)]">
         <Card title="Portfolio Configuration">
           <div className="grid gap-4">
             <FormField
@@ -357,17 +465,17 @@ export default function WebPortfolio() {
               as="select"
               name="visibility"
               value={config.visibility}
-              onChange={handleConfigChange}
+              disabled
             >
               <option value="private">Private / Token-share ready</option>
-              <option value="public">Public (requires Make Public)</option>
+              <option value="public">Public</option>
             </FormField>
           </div>
 
-          {config.includeSections.includes('Contact Links') && availableSections['Contact Links'] && <div className="mt-4 grid gap-2">
-            {["showEmail", "showPhone", "showAddress", "showLinks"].map(
+          {config.includeSections.includes('Contact Information') && availableSections['Contact Information'] && <div className="mt-4 grid gap-2">
+            {["showEmail", "showPhone", "showAddress"].map(
               (name) => (
-                <label key={name}>
+                <label key={name} className="flex items-center gap-2 text-sm text-slate-700">
                   <input
                     type="checkbox"
                     name={name}
@@ -375,11 +483,27 @@ export default function WebPortfolio() {
                     disabled={!availableContacts[name]}
                     onChange={handleConfigChange}
                   />{" "}
-                  {name.replace("show", "Share ")}
+                  {{
+                    showEmail: "Share Email",
+                    showPhone: "Share Phone",
+                    showAddress: "Share Address",
+                  }[name]}
                 </label>
               ),
             )}
           </div>}
+          {config.includeSections.includes('Profile Sources') && availableSections['Profile Sources'] && (
+            <label className="mt-3 flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                name="showLinks"
+                checked={Boolean(availableContacts.showLinks) && Boolean(config.showLinks)}
+                disabled={!availableContacts.showLinks}
+                onChange={handleConfigChange}
+              />
+              Share Profile Source
+            </label>
+          )}
           <div className="mt-5 rounded-xl bg-slate-50 p-4">
             <h3 className="mb-3 font-bold text-ink">Include in Portfolio</h3>
 
@@ -446,10 +570,10 @@ export default function WebPortfolio() {
             <Button
               variant="outline"
               onClick={handleSaveDraft}
-              disabled={saving || !portfolioDraft}
+              disabled={saving || !portfolioDraft || portfolioSaved}
             >
               <Save size={16} />
-              {saving ? "Saving..." : "Save Draft"}
+              {saving ? "Saving..." : portfolioSaved ? "Saved Portfolio" : "Save Portfolio"}
             </Button>
 
             <Button
@@ -468,30 +592,17 @@ export default function WebPortfolio() {
                 setEditing(true);
               }}
             >
+              <Pencil size={16} />
               Edit
             </Button>
-            {editing && (
-              <DraftEditor
-                resume={portfolioDraft.resume}
-                onCancel={() => setEditing(false)}
-                onSave={async (resume) => {
-                  const updated = {
-                    ...portfolioDraft,
-                    resume,
-                    status: "draft",
-                  };
-                  await saveWebPortfolioDraft(userId, {
-                    config,
-                    draft: updated,
-                  });
-                  setPortfolioDraft(updated);
-                  setEditing(false);
-                }}
-              />
-            )}
-            <span role="status" className={`rounded-full px-3 py-1 text-sm font-semibold ${portfolioDraft?.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-              Status: {portfolioDraft ? portfolioDraft.status === "approved" ? "Approved" : "Draft" : "Not generated"}
+            <span role="status" className={`rounded-full px-3 py-1 text-sm font-semibold ${portfolioSaved ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+              Status: {portfolioDraft ? portfolioSaved ? "Saved Portfolio" : "Unsaved Changes" : "Not generated"}
             </span>
+            {portfolioIsPublic && (
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-forge">
+                Public
+              </span>
+            )}
             {portfolioDraft?.warning && (
               <p role="alert">{portfolioDraft.warning}</p>
             )}
@@ -502,21 +613,49 @@ export default function WebPortfolio() {
               Approve for Publishing
             </Button>}
             <Button
-              onClick={handlePublishPortfolio}
-              disabled={saving || portfolioDraft?.status !== "approved"}
+              variant={portfolioIsPublic ? "danger" : "primary"}
+              onClick={portfolioIsPublic ? handleMakePrivate : handlePublishPortfolio}
+              disabled={publishing || saving || (!portfolioIsPublic && portfolioDraft?.status !== "approved")}
             >
-              Make Public
+              {publishing ? "Updating..." : portfolioIsPublic ? "Make Private" : "Make Public"}
             </Button>
           </div>
         </Card>
       </div>
 
       {improvements && <PortfolioImprovements suggestions={improvements.suggestions} notice={improvements.notice} onCancel={()=>setImprovements(null)} onComplete={createReviewedPortfolio} />}
-      {reviewing && portfolioDraft && <ResumeApproval outputName="Portfolio" resume={sharedDraft(portfolioDraft,config).resume} profile={{}} onCancel={()=>setReviewing(false)} onApprove={async resume=>{
+      {editing && portfolioDraft && (
+        <VisualTemplateEditor
+          mode="portfolio"
+          resume={portfolioDraft.resume}
+          onCancel={() => setEditing(false)}
+          onSave={async (resume) => {
+            const updated = {
+              ...portfolioDraft,
+              resume,
+              status: "draft",
+            };
+            const privateConfig = { ...config, visibility: "private" };
+            await saveWebPortfolioDraft(userId, {
+              config: privateConfig,
+              draft: updated,
+            });
+            setConfig(privateConfig);
+            setPortfolioDraft(updated);
+            setSavedFingerprint(portfolioFingerprint(updated, privateConfig));
+            setEditing(false);
+          }}
+        />
+      )}
+      {reviewing && portfolioDraft && <ResumeApproval outputName="Portfolio" resume={sharedDraft(portfolioDraft,config).resume} profile={{}} onCancel={()=>setReviewing(false)} onEdit={()=>{
+        setReviewing(false);
+        setEditing(true);
+      }} onApprove={async resume=>{
         const currentPhoto=profilePhoto(authState?.userProfile || profile,authState?.firebaseUser);
         const draft={...portfolioDraft,resume:{...resume,imgUrl:safeUrl(currentPhoto) || resume.imgUrl || ''},status:'approved'};
         await saveWebPortfolioDraft(userId,{config,draft});
         setPortfolioDraft(draft);
+        setSavedFingerprint(portfolioFingerprint(draft, config));
         setReviewing(false);
       }}/>}
       <div className="hidden">
@@ -526,6 +665,12 @@ export default function WebPortfolio() {
       </div>
     </AppLayout>
   );
+}
+
+function portfolioFingerprint(draft, config) {
+  if (!draft) return "";
+  const { slug: _slug, visibility: _visibility, ...savedConfig } = config || {};
+  return JSON.stringify({ draft, config: savedConfig });
 }
 
 export function PortfolioPreview({
@@ -539,6 +684,7 @@ export function PortfolioPreview({
   onDownloadResume,
   downloading,
   hasResume,
+  sourcesAreShared = false,
 }) {
   const portfolio = draft.resume || {};
   const minimal=config?.themeStyle === 'Minimal White';
@@ -565,14 +711,19 @@ export function PortfolioPreview({
   const email = (!config || config.showEmail) ? profile?.email || portfolio.contact?.email || "" : "";
   const phone = (!config || config.showPhone) ? profile?.phone || portfolio.contact?.phone || "" : "";
   const location = (!config || config.showAddress) ? profile?.location || portfolio.contact?.location || "" : "";
-  const imageUrl =
-    photoSrc || profilePhoto(profile) || portfolio.imgUrl || "";
+  const imageUrl = safeUrl(
+    photoSrc || profilePhoto(profile) || portfolio.imgUrl || "",
+  );
 
   const connectedSources = (profileSources || []).filter(
-    (source) => (!config || config.showLinks) && safeUrl(source.url),
+    (source) =>
+      (!config || config.showLinks) &&
+      (sourcesAreShared
+        ? Boolean(safeUrl(source?.url))
+        : isConnectedProfileSource(source)),
   );
   const experience = portfolio.workExperience || profile?.experience || [];
-  const available = portfolioAvailability({summary: about === 'No summary provided.' ? '' : about, skills, education: educationItems, projects, certifications, experience, email, phone, location}, hasResume ? {status:'approved'} : null, connectedSources);
+  const available = portfolioAvailability({summary: about === 'No summary provided.' ? '' : about, skills, education: educationItems, projects, certifications, experience, email, phone, location}, hasResume ? {status:'approved'} : null, connectedSources.map(source => ({...source,status:'Connected'})));
   const included = section => available[section] && (!Array.isArray(config?.includeSections) || config.includeSections.includes(section));
 
   return (
@@ -582,11 +733,11 @@ export function PortfolioPreview({
         <b className="text-forge">{fullName}</b>
 
         <div className="hidden gap-5 sm:flex">
-          {[[ 'About Me', 'about', 'About'], ['Technical Skills','skills','Skills'], ['Education','education','Education'], ['Featured Projects','projects','Projects'], ['Certifications','certs','Certificates'], ['Work Experience','experience','Experience'], ['Contact Links','contact','Contact']].filter(([section])=>included(section)).map(([section,id,label])=><a key={section} href={`#${id}`} className="cursor-pointer hover:text-forge">{label}</a>)}
+          {[[ 'About Me', 'about', 'About'], ['Technical Skills','skills','Skills'], ['Education','education','Education'], ['Featured Projects','projects','Projects'], ['Certifications','certs','Certificates'], ['Work Experience','experience','Experience'], ['Profile Sources','links','Sources'], ['Contact Information','contact','Contact']].filter(([section])=>included(section)).map(([section,id,label])=><a key={section} href={`#${id}`} className="cursor-pointer hover:text-forge">{label}</a>)}
         </div>
       </div>
 
-      <div className={minimal?'grid gap-6 bg-white p-6 md:grid-cols-[1.2fr_0.8fr]':'grid gap-6 bg-gradient-to-br from-blue-50 via-white to-slate-50 p-6 md:grid-cols-[1.2fr_0.8fr]'}>
+      <div className={`${minimal ? 'bg-white' : 'bg-gradient-to-br from-blue-50 via-white to-slate-50'} grid gap-6 p-6 ${imageUrl ? 'md:grid-cols-[1.2fr_0.8fr]' : ''}`}>
         <div>
           <p className="text-sm text-slate-500">Hello, I'm</p>
 
@@ -598,7 +749,7 @@ export function PortfolioPreview({
 
           {included('About Me') && <p className="mt-4 text-slate-600">{about}</p>}
 
-          {included('Contact Links') && <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
+          {included('Contact Information') && <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600">
             {email && (
               <a href={`mailto:${email}`} className="hover:text-forge">
                 {email}
@@ -621,19 +772,26 @@ export function PortfolioPreview({
               {downloading ? "Downloading..." : "Download Resume"}
             </Button>}
 
-            {included('Contact Links') && <Button variant="outline" onClick={onToggleContact}>
+            {included('Contact Information') && (email || phone || location) && <Button variant="outline" onClick={onToggleContact}>
               <Mail size={16} />
               Contact Me
             </Button>}
           </div>
         </div>
 
-        <div className="grid place-items-center">
-          <ProfileAvatar src={imageUrl} alt={`${fullName} profile photo`} className="h-40 w-40 rounded-full bg-white object-cover shadow-soft" />
-        </div>
+        {imageUrl && (
+          <div className="grid place-items-center">
+            <ProfileAvatar
+              src={imageUrl}
+              fallback={false}
+              alt={`${fullName} profile photo`}
+              className="h-40 w-40 rounded-full bg-white object-cover shadow-soft"
+            />
+          </div>
+        )}
       </div>
 
-      {showContact && included('Contact Links') && (
+      {showContact && included('Contact Information') && (
         <div className="border-b border-blue-100 bg-white p-5">
           <h3 className="mb-3 font-bold text-ink">Contact Information</h3>
 
@@ -659,47 +817,42 @@ export function PortfolioPreview({
               </p>
             )}
 
-            {connectedSources.length > 0 && (
-              <div>
-                <p className="font-bold text-ink">Profile Links:</p>
-
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {connectedSources.map((source) => (
-                    <a
-                      key={source.name}
-                      href={safeUrl(source.url) || undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-forge hover:bg-blue-50"
-                    >
-                      {source.name}
-                      <ExternalLink size={12} />
-                    </a>
-                  ))}
-                </div>
-              </div>
+            {location && (
+              <p>
+                <span className="font-bold text-ink">Location:</span>{" "}
+                {location}
+              </p>
             )}
 
-            {!email && !phone && connectedSources.length === 0 && (
+            {!email && !phone && !location && (
               <p className="text-slate-500">No contact details added yet.</p>
             )}
           </div>
         </div>
       )}
 
-      <div className={minimal?'grid gap-5 border-t bg-white p-6 md:grid-cols-2':'grid gap-5 bg-slate-50 p-6 md:grid-cols-2'}>
-        {included('About Me') && <div id="about">
-          <Mini title="About Me" text={about} />
-        </div>}
+      <div className={minimal?'space-y-5 border-t bg-white p-5 sm:p-6':'space-y-5 bg-slate-50 p-5 sm:p-6'}>
+        {(included('About Me') || included('Education') || included('Technical Skills')) && (
+          <div className={`grid items-start gap-5 ${included('Technical Skills') && (included('About Me') || included('Education')) ? 'lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]' : ''}`}>
+            {(included('About Me') || included('Education')) && (
+              <div className="grid content-start gap-5">
+                {included('About Me') && <div id="about">
+                  <Mini compact title="About Me" text={compactSummary(about)} />
+                </div>}
 
-        {included('Technical Skills') && <div id="skills">
-          <Mini title="Technical Skills" customContent={<PortfolioSkills skills={skills} minimal={minimal} />} />
-        </div>}
+                {included('Education') && <div id="education">
+                  <Mini compact title="Education" customContent={<EducationList items={educationItems} />} />
+                </div>}
+              </div>
+            )}
 
-        {included('Education') && <div id="education">
-          <Mini title="Education" text={formatEducation(educationItems)} />
-        </div>}
+            {included('Technical Skills') && <div id="skills">
+              <Mini title="Technical Skills" customContent={<PortfolioSkills skills={skills} minimal={minimal} />} />
+            </div>}
+          </div>
+        )}
 
+        <div className="grid gap-5 md:grid-cols-2">
         {included('Featured Projects') && <div id="projects">
           <Mini title="Featured Projects" text={formatProjects(projects)} />
         </div>}
@@ -712,49 +865,29 @@ export function PortfolioPreview({
         </div>}
 
         {included('Work Experience') && <div id="experience"><Mini title="Work Experience" text={experience.map(item=>[item.jobTitle,item.companyName,item.description].filter(Boolean).join(' — ')).join('; ')} /></div>}
-        {included('Contact Links') && connectedSources.length > 0 && <div id="links">
+        {included('Profile Sources') && connectedSources.length > 0 && <div id="links">
           <Mini
-            title="Profile Links"
-            customContent={
-              connectedSources.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {connectedSources.map((source) => (
-                    <a
-                      key={source.name}
-                      href={safeUrl(source.url) || undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-3 py-1 text-xs font-bold text-forge hover:bg-blue-50"
-                    >
-                      {source.name}
-                      <ExternalLink size={12} />
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-600">
-                  No profile links added yet.
-                </p>
-              )
-            }
+            title="Profile Sources"
+            customContent={<ProfileSourceList sources={connectedSources} />}
           />
         </div>}
 
-        {included('Contact Links') && <div id="contact">
+        {included('Contact Information') && <div id="contact">
           <Mini
-            title="Contact"
-            text={formatContact(email, phone, connectedSources)}
+            title="Contact Information"
+            customContent={<ContactDetails email={email} phone={phone} location={location} />}
           />
         </div>}
+        </div>
       </div>
     </div>
   );
 }
 
-function Mini({ title, text, customContent }) {
+function Mini({ title, text, customContent, compact = false }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-      <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-forge">
+    <section className={`rounded-lg border border-slate-200 bg-white shadow-sm transition hover:shadow-md ${compact ? "p-4" : "p-5"}`}>
+      <h3 className={`${compact ? "mb-2" : "mb-3"} text-sm font-bold uppercase tracking-wide text-forge`}>
         {title}
       </h3>
 
@@ -763,8 +896,125 @@ function Mini({ title, text, customContent }) {
           {text || "No data available yet."}
         </p>
       )}
+    </section>
+  );
+}
+
+function EducationList({ items = [] }) {
+  if (!items.length) {
+    return <p className="text-sm text-slate-500">No education added yet.</p>;
+  }
+
+  return (
+    <div className="divide-y divide-slate-100">
+      {items.map((item, index) => (
+        <div key={`${item.degree}-${item.school}-${item.year}-${index}`} className="py-3 first:pt-0 last:pb-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-semibold leading-snug text-ink">
+                {item.degree || "Education"}
+              </p>
+              {item.school && (
+                <p className="mt-1 text-sm text-slate-600">{item.school}</p>
+              )}
+            </div>
+            {item.year && (
+              <span className="shrink-0 rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                {item.year}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
+}
+
+function ContactDetails({ email, phone, location }) {
+  const details = [
+    email && { label: "Email", value: email, href: `mailto:${email}`, Icon: Mail },
+    phone && { label: "Phone", value: phone, href: `tel:${phone}`, Icon: Phone },
+    location && { label: "Location", value: location, Icon: MapPin },
+  ].filter(Boolean);
+
+  if (!details.length) {
+    return <p className="text-sm text-slate-500">No contact information shared.</p>;
+  }
+
+  return (
+    <div className="divide-y divide-slate-100">
+      {details.map(({ label, value, href, Icon }) => {
+        const content = (
+          <>
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-blue-50 text-forge">
+              <Icon size={16} aria-hidden="true" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold uppercase text-slate-500">{label}</span>
+              <span className="block break-words text-sm font-medium text-ink">{value}</span>
+            </span>
+          </>
+        );
+        return href ? (
+          <a key={label} href={href} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:text-forge">
+            {content}
+          </a>
+        ) : (
+          <div key={label} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+            {content}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProfileSourceList({ sources = [] }) {
+  return (
+    <div className="divide-y divide-slate-100">
+      {sources.map((source, index) => {
+        const url = safeUrl(source.url);
+        if (!url) return null;
+        const hostname = new URL(url).hostname.replace(/^www\./, "");
+        return (
+          <a
+            key={`${source.name}-${index}`}
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0 hover:text-forge"
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded bg-blue-50 text-forge">
+                <Link2 size={16} aria-hidden="true" />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-semibold text-ink">{source.name || "Professional profile"}</span>
+                <span className="block truncate text-xs text-slate-500">{hostname}</span>
+              </span>
+            </span>
+            <ExternalLink size={15} className="shrink-0 text-slate-400" aria-hidden="true" />
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+function compactSummary(value) {
+  const sentences = String(value || "")
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+  const seen = new Set();
+  return sentences
+    .filter((sentence) => {
+      const key = sentence.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join(" ");
 }
 
 function formatSkills(skills = []) {

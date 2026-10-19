@@ -11,7 +11,7 @@ test('shared snapshots omit provider data and require approval/contact opt-in',(
   assert.throws(()=>filteredDraft({...draft,status:'draft'}));
 });
 test('links require opt-in and safe protocols',()=>{
-  const sources=[{name:'portfolio',url:'https://example.com'},{url:'javascript:alert(1)'}];
+  const sources=[{name:'Portfolio',url:'https://example.com',status:'Connected'},{name:'GitHub',url:'https://github.com/private',status:'Disconnected'},{url:'javascript:alert(1)',status:'Connected'}];
   assert.deepEqual(sharedLinks(sources),[]);
   assert.equal(sharedLinks(sources,{showLinks:true}).length,1);
   assert.deepEqual(sharedLinks(sources,{showLinks:true,includeSections:[]}),[]);

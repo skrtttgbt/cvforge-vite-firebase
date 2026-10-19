@@ -71,6 +71,7 @@ export default function PublicPortfolio() {
           config={{themeStyle:portfolio.themeStyle || 'Modern Blue',showEmail:true,showPhone:true,showAddress:true,showLinks:true}}
           profile={portfolio.publicProfile}
           profileSources={portfolio.publicSources || []}
+          sourcesAreShared
           showContact
           onToggleContact={() => {}}
           onDownloadResume={() => {}}
