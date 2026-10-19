@@ -18,6 +18,7 @@ import AppLayout from "../layouts/AppLayout";
 import Card from "../components/Card";
 import Button from "../components/Button";
 import FormField from "../components/FormField";
+import DocumentStatus from "../components/DocumentStatus";
 import ResumePreview from "../components/ResumePreview";
 import Swal from "sweetalert2";
 import { onAuthChange } from "../services/authservice";
@@ -541,6 +542,13 @@ export default function WebPortfolio() {
         </Card>
 
         <Card title="Portfolio Preview">
+          <DocumentStatus
+            label="Portfolio"
+            exists={Boolean(portfolioDraft)}
+            approvalStatus={portfolioDraft?.status}
+            saved={portfolioSaved}
+            visibility={config.visibility}
+          />
           {!portfolioDraft && <p className="mb-3 text-sm text-slate-600">The resume download button appears inside the generated portfolio preview when Resume Download is selected and your resume is approved.</p>}
           {portfolioDraft ? (
             <PortfolioPreview
@@ -595,14 +603,6 @@ export default function WebPortfolio() {
               <Pencil size={16} />
               Edit
             </Button>
-            <span role="status" className={`rounded-full px-3 py-1 text-sm font-semibold ${portfolioSaved ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-              Status: {portfolioDraft ? portfolioSaved ? "Saved Portfolio" : "Unsaved Changes" : "Not generated"}
-            </span>
-            {portfolioIsPublic && (
-              <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-semibold text-forge">
-                Public
-              </span>
-            )}
             {portfolioDraft?.warning && (
               <p role="alert">{portfolioDraft.warning}</p>
             )}

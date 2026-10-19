@@ -19,6 +19,7 @@ import Button from "../components/Button";
 import FormField from "../components/FormField";
 import ResumePreview from "../components/ResumePreview";
 import ProfileAvatar from "../components/ProfileAvatar";
+import DocumentStatus from "../components/DocumentStatus";
 import { generateAIContent } from "../services/aiService";
 import { onAuthChange } from "../services/authservice";
 import {
@@ -483,20 +484,13 @@ export default function ResumeBuilder() {
           </div>
         </Card>
 
-        <Card
-          title="Resume Preview"
-          right={
-            draft ? (
-              <span className="rounded bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
-                AI Generated Draft
-              </span>
-            ) : (
-              <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
-                No Draft Yet
-              </span>
-            )
-          }
-        >
+        <Card title="Resume Preview">
+          <DocumentStatus
+            label="Resume"
+            exists={Boolean(draft)}
+            approvalStatus={draft?.status}
+            saved={draftSaved}
+          />
           <div className="relative min-h-[300px]">
             {generating && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
@@ -519,7 +513,6 @@ export default function ResumeBuilder() {
 
           <div className="mt-5 flex flex-wrap gap-3">
             {draft?.warning && <p role="alert">{draft.warning}</p>}
-            <span role="status" className={`rounded-full px-3 py-1 text-sm font-semibold ${draft?.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>Status: {draft ? draft.status === "approved" ? "Approved" : "Draft" : "Not generated"}</span>
             {draft?.status !== 'approved' && <Button
               disabled={!draft || editing || generating || reviewing || !!improvements}
               onClick={() => setReviewing(true)}
