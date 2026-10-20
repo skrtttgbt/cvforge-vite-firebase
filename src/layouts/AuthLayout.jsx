@@ -12,7 +12,7 @@ export default function AuthLayout({ type, children }) {
   const accent = isLogin ? "We've Got the Tools." : isRegister ? 'With CVForge.' : 'Get Back to Building.'
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white to-blue-50">
+    <div className="min-h-screen w-100 bg-gradient-to-br from-white to-blue-50">
       <header className="flex items-center justify-between bg-navy px-6 py-4 text-white md:px-10" id="header-authlayout">
         <Logo dark />
         <div className="flex flex-col items-center gap-3 text-sm sm:flex-row sm:gap-0">
@@ -30,7 +30,7 @@ export default function AuthLayout({ type, children }) {
         {/* Left */}
         <section className="flex flex-col justify-center lg:sticky lg:top-10 lg:h-fit">
           
-          <div className="origin-left scale-150">
+          <div className="w-auto origin-left scale-100 transform transition-all duration-300 lg:scale-110">
             <Logo />
           </div>
 

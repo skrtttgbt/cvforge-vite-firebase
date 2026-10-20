@@ -2,7 +2,7 @@ import logoSrc from "../assets/images/logo.png";
 
 export default function Logo({ dark = false }) {
   return (
-    <div className={`flex items-center text-xl px-1 py-1 rounded-lg`}>
+    <div className={`w-auto flex items-center text-xl px-1 py-1 rounded-lg`}>
       <img
         src={logoSrc}
         alt="CVForge Logo"
